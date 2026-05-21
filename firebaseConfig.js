@@ -1,17 +1,19 @@
+// Añade firebase-firestore en las importaciones
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
 import { getAuth } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+import { getFirestore } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
+// Tus credenciales (DEJA LAS QUE YA TIENES AQUÍ)
 const firebaseConfig = {
-  apiKey: "AIzaSyBJfJkR6GKG0oJeUl6B3OR46kA5h9gFqCI",
-  authDomain: "finance-casa.firebaseapp.com",
-  projectId: "finance-casa",
-  storageBucket: "finance-casa.firebasestorage.app",
-  messagingSenderId: "482815043136",
-  appId: "1:482815043136:web:ab8687fb6016de975b61a5",
-  measurementId: "G-KR3T811JRL"
+    apiKey: "TU_API_KEY",
+    authDomain: "tu-proyecto.firebaseapp.com",
+    projectId: "tu-proyecto",
+    storageBucket: "tu-proyecto.appspot.com",
+    messagingSenderId: "TUS_NUMEROS",
+    appId: "TU_APP_ID"
 };
 
+// Inicializar servicios
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-
-export { auth };
+export const auth = getAuth(app);
+export const db = getFirestore(app); // <-- ¡Nueva línea para exportar la base de datos!
