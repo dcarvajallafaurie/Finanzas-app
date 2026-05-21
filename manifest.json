@@ -1,0 +1,16 @@
+{
+    "name": "Finanzas Casa",
+    "short_name": "Finanzas",
+    "start_url": "./index.html",
+    "display": "standalone",
+    "background_color": "#4f46e5",
+    "theme_color": "#4f46e5",
+    "icons": [
+      {
+        "src": "https://cdn-icons-png.flaticon.com/512/3135/3135679.png",
+        "sizes": "512x512",
+        "type": "image/png",
+        "purpose": "any maskable"
+      }
+    ]
+}

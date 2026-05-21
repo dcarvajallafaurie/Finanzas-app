@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.json">
+    <title>Finanzas Casa</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+
+    <div id="app-container">
+        
+        <div class="glass-panel" id="auth-panel">
+            <h2>Sofi y Dani</h2>
+            <p style="opacity: 0.6; margin-bottom: 20px;">Acceso Seguro</p>
+            
+            <input type="email" id="email" class="glass-input" placeholder="Correo electrónico">
+            <input type="password" id="password" class="glass-input" placeholder="Contraseña">
+            
+            <button id="btnLogin" class="glass-btn">Iniciar Sesión</button>
+            <button id="btnRegister" class="glass-btn secondary">Crear Cuenta</button>
+            <p id="error-message" style="color: #ff8a8a; margin-top: 15px; font-size: 14px; display: none;"></p>
+        </div>
+
+        <div id="dashboard-panel" style="display: none;">
+            
+            <div class="view-container active" id="view-home">
+                <div class="top-header">
+                    <div class="user-info">
+                        <div class="avatar"><i data-lucide="user"></i></div>
+                        <span id="user-display">Usuario</span>
+                    </div>
+                    <button id="btnLogout" class="icon-btn"><i data-lucide="log-out"></i></button>
+                </div>
+
+                <div class="balance-display">
+                    <h1 id="total-balance">$0 <i data-lucide="chevron-right" style="width: 20px; opacity: 0.5;"></i></h1>
+                    <p class="subtitle">Saldo Total</p>
+                </div>
+
+                <div class="cards-scroller">
+                    <div class="summary-card income-card">
+                        <i data-lucide="trending-up"></i>
+                        <div>
+                            <p>Ingresos</p>
+                            <h3 id="total-income">+$0</h3>
+                        </div>
+                    </div>
+                    <div class="summary-card expense-card">
+                        <i data-lucide="trending-down"></i>
+                        <div>
+                            <p>Egresos</p>
+                            <h3 id="total-expense">-$0</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="quick-actions">
+                    <button onclick="toggleForm('transaction')">
+                        <div class="icon-circle"><i data-lucide="plus"></i></div>
+                        <span>Añadir</span>
+                    </button>
+                    <button onclick="showView('wealth')">
+                        <div class="icon-circle"><i data-lucide="landmark"></i></div>
+                        <span>Activos</span>
+                    </button>
+                    <button onclick="showView('budgets')">
+                        <div class="icon-circle"><i data-lucide="pie-chart"></i></div>
+                        <span>Metas</span>
+                    </button>
+                </div>
+
+                <div class="last-operations glass-box">
+                    <div class="section-head">
+                        <h3>Últimos movimientos</h3>
+                    </div>
+                    <div id="transaction-list" class="item-list">
+                        </div>
+                </div>
+            </div>
+
+            <div class="view-container" id="view-budgets">
+                <h3 class="view-title">Presupuestos</h3>
+                <div id="budget-list" class="item-list glass-box"></div>
+                <button class="floating-action-btn" onclick="toggleForm('budget')"><i data-lucide="plus"></i></button>
+            </div>
+
+            <div class="view-container" id="view-wealth">
+                <h3 class="view-title">Patrimonio Total</h3>
+                <h1 id="total-wealth-value" class="massive-balance">$0</h1>
+                <div id="wealth-list" class="item-list glass-box" style="margin-top: 20px;"></div>
+                <button class="floating-action-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
+            </div>
+
+            <nav class="bottom-nav">
+                <button class="nav-item active" onclick="showView('home')"><i data-lucide="home"></i></button>
+                <button class="nav-item" onclick="showView('budgets')"><i data-lucide="target"></i></button>
+                <button class="nav-item" onclick="showView('wealth')"><i data-lucide="layers"></i></button>
+            </nav>
+        </div>
+
+        <div class="modal-overlay" id="modal-form">
+            <div class="modal-content glass-box">
+                <div class="modal-header">
+                    <h4 id="form-title">Añadir</h4>
+                    <button class="close-btn" onclick="toggleForm()"><i data-lucide="x"></i></button>
+                </div>
+                <div id="form-fields"></div>
+                
+                <div class="modal-actions">
+                    <button class="glass-btn delete-btn" id="btnDeleteForm" style="display: none; background: rgba(244, 63, 94, 0.2); color: #ff8a8a; border: none; margin-top: 15px;">Eliminar</button>
+                    <button class="glass-btn" id="btnSubmitForm">Guardar</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script type="module" src="firebaseConfig.js"></script>
+    <script type="module" src="app.js"></script>
+    <script>lucide.createIcons();</script>
+</body>
+</html>
