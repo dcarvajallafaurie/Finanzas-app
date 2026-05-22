@@ -8,8 +8,7 @@ let currentMonth = new Date().toISOString().slice(0, 7);
 let TRM = 3900; 
 let myChart = null;
 
-// Paleta de colores para gráficos
-const chartColors = ['#ef4444', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ec4899'];
+const chartColors = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6', '#ec4899'];
 
 const CATEGORIES = {
     budget: ["Alimentación", "Transporte", "Servicios", "Entretenimiento", "Salud", "Otras categorías"],
@@ -24,11 +23,9 @@ const CATEGORIES = {
     ]
 };
 
-// --- FECHA DINÁMICA ---
 function formatearFechaHoy() {
     const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const fechaActual = new Date();
-    return fechaActual.toLocaleDateString('es-CO', opciones); // Formato local Colombia
+    return new Date().toLocaleDateString('es-CO', opciones); 
 }
 document.getElementById("full-date-display").textContent = formatearFechaHoy();
 
@@ -40,14 +37,14 @@ document.getElementById("month-selector").addEventListener("change", (e) => {
 
 fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json()).then(data => {
     TRM = data.rates.COP;
-    document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)} COP`;
+    document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)}`;
 }).catch(e => console.log("Error TRM"));
 
 document.getElementById("btnThemeToggle").addEventListener("click", () => document.body.classList.toggle("light-mode"));
 
 function formatMoney(amount) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount); }
 
-// --- AUTH Y CAPTCHA ---
+// --- AUTH ---
 let captchaCorrect = 0;
 document.getElementById("btnRegister").addEventListener("click", () => {
     document.getElementById("btnLogin").style.display = "none";
@@ -84,7 +81,7 @@ onAuthStateChanged(auth, (user) => {
         currentUser = user;
         document.getElementById("auth-panel").style.display = "none";
         document.getElementById("dashboard-panel").style.display = "flex";
-        document.getElementById("user-display").textContent = `Hola, ${user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0]}`;
+        document.getElementById("user-display").textContent = `EVA | Hola, ${user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0]}`;
         cargarDatos();
         window.showView('home'); 
     } else {
@@ -94,7 +91,6 @@ onAuthStateChanged(auth, (user) => {
     }
 });
 
-// --- LECTURA BASE DE DATOS ---
 function cargarDatos() {
     const q = (col) => query(collection(db, col), where("userId", "==", currentUser.uid));
     onSnapshot(q("transactions"), snap => { transactions = snap.docs.map(d => ({id: d.id, ...d.data()})); actualizarDatosUI(); });
@@ -112,7 +108,16 @@ window.showView = (v) => {
     actualizarDatosUI();
 };
 
-// --- RENDERIZADO ---
+// Toggle para expandir el presupuesto
+window.toggleBudgetDetails = (id) => {
+    const detailsDiv = document.getElementById(`budget-details-${id}`);
+    if (detailsDiv.style.display === 'none' || detailsDiv.style.display === '') {
+        detailsDiv.style.display = 'flex';
+    } else {
+        detailsDiv.style.display = 'none';
+    }
+};
+
 function actualizarDatosUI() {
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth);
     let incMonth = currentMonthTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -122,7 +127,7 @@ function actualizarDatosUI() {
     
     if (rollover > 0) {
         incMonth += rollover; 
-        document.getElementById("rollover-indicator").textContent = `Saldo (+${formatMoney(rollover)} del mes pasado)`;
+        document.getElementById("rollover-indicator").textContent = `Saldo (+${formatMoney(rollover)} de remanente)`;
     } else { document.getElementById("rollover-indicator").textContent = "Saldo Total Disponible"; }
 
     document.getElementById("total-income").textContent = `+${formatMoney(incMonth)}`;
@@ -136,13 +141,34 @@ function actualizarDatosUI() {
         cList.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
     });
 
+    // PRESUPUESTOS (DISEÑO LIMPIO Y DESPLEGABLE)
     const bList = document.getElementById("budget-list");
     bList.innerHTML = '';
     budgets.forEach(b => {
         const spent = currentMonthTrans.filter(t => t.type === 'expense' && t.category === b.category).reduce((s, t) => s + t.amount, 0);
         let pct = Math.min((spent / b.amount) * 100, 100);
         let color = pct >= 90 ? 'danger' : (pct >= 70 ? 'warning' : '');
-        bList.innerHTML += `<div class="item-card budget-card" onclick="openEditForm('budget', '${b.id}')"><div class="budget-header"><div class="item-left"><div class="item-icon"><i data-lucide="target"></i></div><div class="item-info"><h5>${b.category}</h5></div></div><div style="font-weight:600;">Límite: ${formatMoney(b.amount)}</div></div><div class="budget-progress-container"><div class="budget-progress-fill ${color}" style="width: ${pct}%;"></div></div><div class="budget-stats"><span>Gastado: ${formatMoney(spent)}</span><span>Restante: ${formatMoney(b.amount - spent)}</span></div></div>`;
+        
+        bList.innerHTML += `
+            <div class="item-card budget-card" onclick="toggleBudgetDetails('${b.id}')">
+                <div class="budget-header">
+                    <div class="item-left">
+                        <div class="item-icon"><i data-lucide="target"></i></div>
+                        <div class="item-info"><h5 style="margin:0; font-size:16px;">${b.category}</h5></div>
+                    </div>
+                    <div style="font-weight:700; font-size:16px;">${formatMoney(b.amount)}</div>
+                </div>
+                <div class="budget-progress-container">
+                    <div class="budget-progress-fill ${color}" style="width: ${pct}%;"></div>
+                </div>
+                <div id="budget-details-${b.id}" class="budget-details">
+                    <div class="budget-stats">
+                        <span>Gastado: <b>${formatMoney(spent)}</b></span>
+                        <span style="text-align:right;">Restante: <b>${formatMoney(b.amount - spent)}</b></span>
+                    </div>
+                    <button class="glass-btn secondary" style="padding:10px; font-size:14px;" onclick="event.stopPropagation(); openEditForm('budget', '${b.id}')">Editar o Eliminar</button>
+                </div>
+            </div>`;
     });
 
     document.getElementById("total-wealth-value").textContent = formatMoney(wealth.reduce((s, w) => s + w.amount, 0));
@@ -163,7 +189,7 @@ function actualizarDatosUI() {
         const ccList = document.getElementById("cc-transactions-list");
         ccList.innerHTML = '';
         ccTransactions.filter(t=> t.month === currentMonth).forEach(t => {
-            let cuotasInfo = t.cuotas > 1 ? `<span style="color:#f43f5e; font-weight:bold;">(${t.cuotas} cuotas - Total pagado será: ${formatMoney(t.totalDebt)})</span>` : '';
+            let cuotasInfo = t.cuotas > 1 ? `<span style="color:var(--expense-color); font-weight:bold;">(${t.cuotas} cuotas - Total: ${formatMoney(t.totalDebt)})</span>` : '';
             ccList.innerHTML += `<div class="item-card" onclick="openEditForm('cc-transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description} ${cuotasInfo}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
         });
     }
@@ -175,7 +201,7 @@ window.openFilteredTransactionsModal = (type) => {
     document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Total Ingresos' : 'Total Egresos';
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth && t.type === type);
     const container = document.getElementById("filtered-transactions-list");
-    container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">No hay movimientos registrados.</p>`;
+    container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">No hay movimientos.</p>`;
     currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
         let isInc = t.type === 'income';
         container.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
@@ -201,17 +227,17 @@ window.toggleForm = (type = null) => {
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     } else if (type === 'wealth') {
         titleEl.textContent = "Añadir a Portafolio";
-        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre (Ej. Banco de Bogotá)"><input type="number" id="f-amount" class="glass-input" placeholder="Monto actual ($)"><div style="margin-top:15px; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="f-usd" style="width:18px; height:18px;"> <label style="font-size:14px;">Es un activo en Dólares (USD)</label></div>`;
+        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><input type="number" id="f-amount" class="glass-input" placeholder="Monto actual ($)"><div style="margin-top:15px; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="f-usd" style="width:18px; height:18px;"> <label style="font-size:14px;">Activo en Dólares (USD)</label></div>`;
     } else if (type === 'budget') {
         titleEl.textContent = "Nuevo Presupuesto";
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
         titleEl.textContent = "Compra a Crédito";
-        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)"><input type="number" id="f-cuotas" class="glass-input" placeholder="Número de cuotas" value="1" min="1"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea><p style="font-size:12px; opacity:0.7; margin-top:10px;">A más de 1 cuota se aplica 28.17% EA de interés.</p>`;
+        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)"><input type="number" id="f-cuotas" class="glass-input" placeholder="Número de cuotas" value="1" min="1"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea><p style="font-size:12px; color:var(--text-muted); margin-top:10px;">Más de 1 cuota aplica 28.17% EA.</p>`;
     } else if (type === 'edit-cc-limit') {
         titleEl.textContent = "Ajustar Cupo";
         let actualLimit = creditCards.length > 0 ? creditCards[0].limit : 0;
-        fields.innerHTML = `<p style="font-size:14px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta.</p><input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">`;
+        fields.innerHTML = `<p style="font-size:14px; margin-bottom:10px;">Define el límite de tu tarjeta.</p><input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">`;
     }
 };
 
@@ -230,7 +256,6 @@ window.openEditForm = (type, id) => {
     }
 };
 
-// --- GUARDAR Y ELIMINAR ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
     const fCat = document.getElementById("f-cat"), fAmount = document.getElementById("f-amount"), fType = document.getElementById("f-type");
@@ -274,7 +299,6 @@ document.getElementById("btnDeleteForm").addEventListener("click", async () => {
     try { await deleteDoc(doc(db, colName, editingId)); window.toggleForm(); window.closeFilteredTransactionsModal(); } catch (e) { alert("Error: " + e.message); }
 });
 
-// --- GRÁFICOS AVANZADOS (ESTILO MONEFY) ---
 window.openChartModal = () => {
     document.getElementById("modal-chart").classList.add('active');
     const ctx = document.getElementById('monthlyChart').getContext('2d');
@@ -287,11 +311,8 @@ window.openChartModal = () => {
     });
 
     document.getElementById("chart-total-expense").textContent = formatMoney(totalExpense);
-    
-    // Generar leyenda HTML personalizada
     const legendContainer = document.getElementById("custom-legend");
     legendContainer.innerHTML = '';
-    
     const categories = Object.keys(expByCategory);
     const dataValues = Object.values(expByCategory);
 
@@ -302,15 +323,14 @@ window.openChartModal = () => {
             <div class="legend-item">
                 <div class="legend-label"><span class="legend-color-box" style="background:${color}"></span>${cat}</div>
                 <div><span class="legend-value">${formatMoney(dataValues[index])}</span><span class="legend-percentage">${percent}%</span></div>
-            </div>
-        `;
+            </div>`;
     });
 
     if(myChart) myChart.destroy();
     myChart = new Chart(ctx, {
         type: 'doughnut',
-        data: { labels: categories, datasets: [{ data: dataValues, backgroundColor: chartColors, borderWidth: 4, borderColor: getComputedStyle(document.body).getPropertyValue('--glass-bg').trim(), hoverOffset: 4, borderRadius: 8 }] },
-        options: { cutout: '78%', plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, titleFont: {size: 14}, bodyFont: {size: 14, weight: 'bold'}, displayColors: false, callbacks: { label: function(context) { return formatMoney(context.raw); } } } } }
+        data: { labels: categories, datasets: [{ data: dataValues, backgroundColor: chartColors, borderWidth: 2, borderColor: getComputedStyle(document.body).getPropertyValue('--glass-bg').trim(), hoverOffset: 4, borderRadius: 4 }] },
+        options: { cutout: '78%', plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.9)', padding: 12, titleFont: {size: 14}, bodyFont: {size: 14, weight: 'bold'}, displayColors: false, callbacks: { label: function(context) { return formatMoney(context.raw); } } } } }
     });
 };
 window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');

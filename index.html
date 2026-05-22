@@ -6,17 +6,19 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    <title>Liquid Finance</title>
-    <link rel="stylesheet" href="style.css?v=7">
+    <title>EVA</title>
+    <link rel="stylesheet" href="style.css?v=8">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
     <div id="app-container">
-        <div class="glass-panel fade-in" id="auth-panel">
-            <h2 class="app-title">Liquid Finance</h2>
-            <p style="opacity: 0.6; margin-bottom: 20px;">Acceso Seguro</p>
+        <div class="glass-panel fade-in" id="auth-panel" style="padding: 40px 20px; border: none; background: rgba(15, 23, 42, 0.4);">
+            <div style="margin-bottom: 40px;">
+                <h2 class="app-title" style="font-size: 46px; font-weight: 800; letter-spacing: 6px;">EVA</h2>
+                <p style="opacity: 0.5; font-size: 11px; letter-spacing: 4px; text-transform: uppercase;">Inteligencia Financiera</p>
+            </div>
             
             <div id="register-fields" style="display: none;">
                 <input type="text" id="nombre" class="glass-input" placeholder="Nombre">
@@ -34,9 +36,9 @@
                 </div>
             </div>
 
-            <button id="btnLogin" class="glass-btn pulse-btn">Iniciar Sesión</button>
-            <button id="btnRegister" class="glass-btn secondary">Crear Cuenta</button>
-            <button id="btnSubmitRegister" class="glass-btn pulse-btn" style="display: none; background: #4ca39b;">Confirmar</button>
+            <button id="btnLogin" class="glass-btn pulse-btn" style="margin-top: 30px;">Iniciar Sesión</button>
+            <button id="btnRegister" class="glass-btn secondary" style="border-color: rgba(255,255,255,0.2);">Crear Cuenta</button>
+            <button id="btnSubmitRegister" class="glass-btn pulse-btn" style="display: none;">Confirmar Registro</button>
             <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver</button>
             <p id="error-message" style="color: #ff8a8a; margin-top: 15px; display: none;"></p>
         </div>
@@ -77,7 +79,7 @@
 
                 <div class="quick-actions">
                     <button onclick="toggleForm('transaction')"><div class="icon-circle gradient-bg"><i data-lucide="plus"></i></div><span>Añadir</span></button>
-                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Bolsillos</span></button>
+                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Portafolio</span></button>
                     <button onclick="openChartModal()"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Análisis</span></button>
                 </div>
 
@@ -96,7 +98,7 @@
             <div class="view-container fade-in" id="view-credit">
                 <h3 class="view-title">Tarjeta de Crédito</h3>
                 <div class="glass-box cc-hero-card">
-                    <button onclick="toggleForm('edit-cc-limit')" class="cc-edit-btn"><i data-lucide="edit-2"></i></button>
+                    <button onclick="toggleForm('edit-cc-limit')" class="cc-edit-btn"><i data-lucide="settings"></i></button>
                     <p class="cc-label">DEUDA TOTAL ACUMULADA</p>
                     <h1 id="cc-debt" class="cc-balance">$0</h1>
                     <p class="cc-limit">Cupo Disponible: <span id="cc-available">$0</span></p>
@@ -109,7 +111,7 @@
             <div class="view-container fade-in" id="view-wealth">
                 <h3 class="view-title">Mi Portafolio</h3>
                 <h1 id="total-wealth-value" class="massive-balance">$0</h1>
-                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Tus activos (TRM hoy: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">Cargando...</span>)</p>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Activos (TRM: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">...</span>)</p>
                 <div id="wealth-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn pulse-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
             </div>
@@ -142,7 +144,6 @@
                     <h4>Análisis de Egresos</h4>
                     <button class="close-btn" onclick="closeChartModal()"><i data-lucide="x"></i></button>
                 </div>
-                
                 <div class="chart-wrapper">
                     <canvas id="monthlyChart"></canvas>
                     <div class="chart-center-info">
@@ -150,7 +151,6 @@
                         <h3 id="chart-total-expense">$0</h3>
                     </div>
                 </div>
-                
                 <div id="custom-legend" class="custom-legend-container"></div>
             </div>
         </div>
