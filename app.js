@@ -5,7 +5,7 @@ import { auth, db } from "./firebaseConfig.js";
 // --- VARIABLES GLOBALES Y ESTADO ---
 let budgets = [], transactions = [], wealth = [], creditCards = [], ccTransactions = [];
 let activeFormType = null, editingId = null, currentUser = null;
-let currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
+let currentMonth = new Date().toISOString().slice(0, 7); 
 let TRM = 3900; 
 let myChart = null;
 
@@ -34,16 +34,12 @@ document.getElementById("month-selector").addEventListener("change", (e) => {
     actualizarDatosUI();
 });
 
-fetch('https://open.er-api.com/v6/latest/USD')
-    .then(res => res.json())
-    .then(data => {
-        TRM = data.rates.COP;
-        document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)} COP`;
-    }).catch(e => console.log("Error TRM"));
+fetch('https://open.er-api.com/v6/latest/USD').then(res => res.json()).then(data => {
+    TRM = data.rates.COP;
+    document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)} COP`;
+}).catch(e => console.log("Error TRM"));
 
-document.getElementById("btnThemeToggle").addEventListener("click", () => {
-    document.body.classList.toggle("light-mode");
-});
+document.getElementById("btnThemeToggle").addEventListener("click", () => document.body.classList.toggle("light-mode"));
 
 function formatMoney(amount) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount); }
 
@@ -69,7 +65,8 @@ document.getElementById("btnSubmitRegister").addEventListener("click", async () 
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: `${nombre} ${apellido}` });
-        await addDoc(collection(db, "creditCards"), { userId: cred.user.uid, limit: 2000000, debt: 0, createdAt: Date.now() });
+        // Cupo inicial por defecto (el usuario lo puede editar luego)
+        await addDoc(collection(db, "creditCards"), { userId: cred.user.uid, limit: 2000000, createdAt: Date.now() });
     } catch (e) { alert(e.message); }
 });
 
@@ -155,16 +152,26 @@ function actualizarDatosUI() {
         wList.innerHTML += `<div class="item-card" onclick="openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatMoney(w.amount)}</div></div>`;
     });
 
+    // --- LÓGICA INTELIGENTE DE TARJETA DE CRÉDITO ---
     if(creditCards.length > 0) {
         let cc = creditCards[0];
-        let debt = ccTransactions.filter(t=> t.month === currentMonth).reduce((s,t)=> s + t.amount, 0);
-        document.getElementById("cc-debt").textContent = formatMoney(debt);
-        document.getElementById("cc-available").textContent = formatMoney(cc.limit - debt);
+        
+        // Sumamos toda la deuda histórica (con intereses calculados)
+        let totalCCDebtGenerated = ccTransactions.reduce((s,t) => s + (t.totalDebt || t.amount), 0);
+        // Sumamos todos los pagos históricos a la tarjeta
+        let totalCCPayments = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s,t) => s + t.amount, 0);
+        
+        // La deuda actual es lo que se gastó menos lo que se pagó (nunca menor a 0)
+        let currentDebt = Math.max(0, totalCCDebtGenerated - totalCCPayments);
+        
+        document.getElementById("cc-debt").textContent = formatMoney(currentDebt);
+        document.getElementById("cc-available").textContent = formatMoney(cc.limit - currentDebt);
         
         const ccList = document.getElementById("cc-transactions-list");
         ccList.innerHTML = '';
         ccTransactions.filter(t=> t.month === currentMonth).forEach(t => {
-            ccList.innerHTML += `<div class="item-card" onclick="openEditForm('cc-transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
+            let cuotasInfo = t.cuotas > 1 ? `<span style="color:#ef4444; font-weight:bold;">(${t.cuotas} cuotas - Total pagado será: ${formatMoney(t.totalDebt)})</span>` : '';
+            ccList.innerHTML += `<div class="item-card" onclick="openEditForm('cc-transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description} ${cuotasInfo}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
         });
     }
     lucide.createIcons();
@@ -190,8 +197,6 @@ document.getElementById("expense-summary").addEventListener("click", () => windo
 // --- FORMULARIOS ---
 window.toggleForm = (type = null) => {
     activeFormType = type;
-    
-    // SOLUCIÓN 1: Limpiamos la variable de edición y OCULTAMOS el botón de eliminar siempre que se abra el modal
     editingId = null;
     document.getElementById("btnDeleteForm").style.display = 'none';
 
@@ -207,14 +212,27 @@ window.toggleForm = (type = null) => {
     } else if (type === 'budget') {
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
-        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor gastado con TC ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
+        fields.innerHTML = `
+            <select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
+            <input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)">
+            <input type="number" id="f-cuotas" class="glass-input" placeholder="Número de cuotas (Ej: 1)" value="1" min="1">
+            <textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>
+            <p style="font-size:11px; opacity:0.7; margin-top:10px;">A 1 cuota: 0% interés. A más cuotas: 28.17% EA.</p>
+        `;
+    } else if (type === 'edit-cc-limit') {
+        document.getElementById("form-title").textContent = "Ajustar Tarjeta";
+        let actualLimit = creditCards.length > 0 ? creditCards[0].limit : 0;
+        fields.innerHTML = `
+            <p style="font-size:12px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta.</p>
+            <input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">
+        `;
     }
 };
 
 window.openEditForm = (type, id) => {
     window.toggleForm(type);
-    editingId = id; // Volvemos a asignarlo porque toggleForm lo limpió
-    document.getElementById("btnDeleteForm").style.display = 'block'; // SOLO lo mostramos si estamos editando
+    editingId = id; 
+    document.getElementById("btnDeleteForm").style.display = 'block'; 
     
     let item;
     if (type === 'wealth') item = wealth.find(i => i.id === id);
@@ -235,11 +253,10 @@ window.openEditForm = (type, id) => {
     }
 };
 
-// --- GUARDAR (AHORA CON PROTECCIÓN ANTI-BLOQUEO) ---
+// --- GUARDAR ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
     
-    // Validación básica para evitar que el código explote si falta información
     const fCat = document.getElementById("f-cat");
     const fAmount = document.getElementById("f-amount");
     const fType = document.getElementById("f-type");
@@ -256,99 +273,10 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     try {
         let data = { userId: currentUser.uid, createdAt: Date.now() };
 
-        if (activeFormType === 'wealth') {
-            let amt = parseFloat(fAmount.value);
-            if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
-            const [name, icon] = fType.value.split('|');
-            data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
-            if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
-            else await addDoc(collection(db, "wealth"), data);
-
-        } else if (activeFormType === 'transaction') {
-            const cat = fCat.value;
-            const amt = parseFloat(fAmount.value);
-            data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
-            if (cat === "Emergencia") {
-                let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
-                if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
+        if (activeFormType === 'edit-cc-limit') {
+            if (creditCards.length > 0) {
+                await updateDoc(doc(db, "creditCards", creditCards[0].id), { limit: parseFloat(fAmount.value) });
+            } else {
+                await addDoc(collection(db, "creditCards"), { userId: currentUser.uid, limit: parseFloat(fAmount.value), createdAt: Date.now() });
             }
-            if (cat === "Pago Tarjeta" && creditCards.length > 0) {
-                let cc = creditCards[0];
-                await updateDoc(doc(db, "creditCards", cc.id), { debt: Math.max(0, cc.debt - amt) });
-            }
-            if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
-            else await addDoc(collection(db, "transactions"), data);
-
-        } else if (activeFormType === 'cc-transaction') {
-            data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value), description: document.getElementById("f-desc").value, month: currentMonth };
-            if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
-            else {
-                await addDoc(collection(db, "ccTransactions"), data);
-                if(creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { debt: creditCards[0].debt + data.amount });
-            }
-        } else if (activeFormType === 'budget') {
-            data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value) };
-            if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
-            else await addDoc(collection(db, "budgets"), data);
-        }
-        
-        window.toggleForm(); // Cierra el modal solo si todo salió bien
-    } catch (error) {
-        alert("Hubo un error al guardar: " + error.message);
-    } finally {
-        // SOLUCIÓN 2: Pase lo que pase (éxito o error), devolvemos el botón a la normalidad
-        btn.disabled = false;
-        btn.textContent = "Guardar";
-    }
-});
-
-// --- ELIMINAR ---
-document.getElementById("btnDeleteForm").addEventListener("click", async () => {
-    if (!editingId) return;
-    
-    let collectionName = '';
-    if (activeFormType === 'transaction') collectionName = 'transactions';
-    else if (activeFormType === 'budget') collectionName = 'budgets';
-    else if (activeFormType === 'wealth') collectionName = 'wealth';
-    else if (activeFormType === 'cc-transaction') collectionName = 'ccTransactions';
-
-    try {
-        await deleteDoc(doc(db, collectionName, editingId));
-        window.toggleForm(); 
-        window.closeFilteredTransactionsModal(); 
-    } catch (e) {
-        alert("Error al intentar eliminar: " + e.message);
-    }
-});
-
-// --- GRÁFICOS ---
-window.openChartModal = () => {
-    document.getElementById("modal-chart").classList.add('active');
-    const ctx = document.getElementById('monthlyChart').getContext('2d');
-    let expByCategory = {};
-    transactions.filter(t => t.type === 'expense' && t.month === currentMonth).forEach(t => {
-        expByCategory[t.category] = (expByCategory[t.category] || 0) + t.amount;
-    });
-
-    if(myChart) myChart.destroy();
-    myChart = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-            labels: Object.keys(expByCategory),
-            datasets: [{
-                data: Object.values(expByCategory),
-                backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6'],
-                borderWidth: 0
-            }]
-        },
-        options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-main)' } } } }
-    });
-};
-window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
-
-// Cerrar cualquier modal al tocar el fondo oscuro
-window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('active');
-    }
-});
+        } else if (activeFormType === 'wealth') {
