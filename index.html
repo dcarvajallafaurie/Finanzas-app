@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>Liquid Finance</title>
-    <link rel="stylesheet" href="style.css?v=5">
+    <link rel="stylesheet" href="style.css?v=6">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -86,13 +86,20 @@
 
             <div class="view-container" id="view-credit">
                 <h3 class="view-title">Tarjeta de Crédito</h3>
-                <div class="glass-box" style="margin-bottom: 20px; background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white; position: relative;">
-                    <button onclick="toggleForm('edit-cc-limit')" style="position: absolute; top: 15px; right: 15px; background: rgba(255,255,255,0.2); border: none; color: white; border-radius: 50%; width: 35px; height: 35px; display: flex; justify-content: center; align-items: center; cursor: pointer;"><i data-lucide="edit-2" style="width: 16px;"></i></button>
+                
+                <div class="glass-box" style="margin-bottom: 15px; background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white;">
                     <p style="opacity: 0.8; font-size: 12px; margin-bottom: 5px;">DEUDA TOTAL ACUMULADA</p>
                     <h1 id="cc-debt" style="font-size: 32px; margin: 5px 0;">$0</h1>
                     <p style="font-size: 12px; opacity: 0.9;">Cupo Disponible: <span id="cc-available" style="font-weight: bold;">$0</span></p>
                 </div>
+                
+                <button onclick="toggleForm('edit-cc-limit')" class="glass-btn secondary" style="margin-top: 0; margin-bottom: 25px; border: 1px dashed var(--text-muted); color: var(--text-muted);">
+                    <i data-lucide="settings" style="width: 18px; margin-right: 8px; vertical-align: middle;"></i> Configurar Cupo Máximo
+                </button>
+
+                <div class="section-head"><h3>Movimientos de la Tarjeta</h3></div>
                 <div id="cc-transactions-list" class="item-list glass-box"></div>
+                
                 <button class="floating-action-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
             </div>
 
@@ -115,7 +122,7 @@
         <div class="modal-overlay" id="modal-form">
             <div class="modal-content glass-box">
                 <div class="modal-header">
-                    <h4 id="form-title">Añadir</h4>
+                    <h4 id="form-title">Cargando...</h4>
                     <button class="close-btn" onclick="toggleForm()"><i data-lucide="x"></i></button>
                 </div>
                 <div id="form-fields"></div>

@@ -65,7 +65,6 @@ document.getElementById("btnSubmitRegister").addEventListener("click", async () 
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: `${nombre} ${apellido}` });
-        // Cupo inicial por defecto (el usuario lo puede editar luego)
         await addDoc(collection(db, "creditCards"), { userId: cred.user.uid, limit: 2000000, createdAt: Date.now() });
     } catch (e) { alert(e.message); }
 });
@@ -152,16 +151,12 @@ function actualizarDatosUI() {
         wList.innerHTML += `<div class="item-card" onclick="openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatMoney(w.amount)}</div></div>`;
     });
 
-    // --- LÓGICA INTELIGENTE DE TARJETA DE CRÉDITO ---
+    // LÓGICA DE TARJETA DE CRÉDITO
     if(creditCards.length > 0) {
         let cc = creditCards[0];
-        
-        // Sumamos toda la deuda histórica (con intereses calculados)
         let totalCCDebtGenerated = ccTransactions.reduce((s,t) => s + (t.totalDebt || t.amount), 0);
-        // Sumamos todos los pagos históricos a la tarjeta
         let totalCCPayments = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s,t) => s + t.amount, 0);
         
-        // La deuda actual es lo que se gastó menos lo que se pagó (nunca menor a 0)
         let currentDebt = Math.max(0, totalCCDebtGenerated - totalCCPayments);
         
         document.getElementById("cc-debt").textContent = formatMoney(currentDebt);
@@ -204,14 +199,19 @@ window.toggleForm = (type = null) => {
     
     document.getElementById("modal-form").classList.add('active');
     const fields = document.getElementById("form-fields");
+    const titleEl = document.getElementById("form-title");
     
     if (type === 'transaction') {
+        titleEl.textContent = "Nuevo Movimiento";
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     } else if (type === 'wealth') {
-        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><div style="display:flex; gap:10px;"><input type="number" id="f-amount" class="glass-input" placeholder="Monto"><div style="margin-top:15px; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="f-usd"> <label style="font-size:12px;">Es USD</label></div></div>`;
+        titleEl.textContent = "Añadir a Portafolio";
+        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><input type="number" id="f-amount" class="glass-input" placeholder="Monto actual ($)"><div style="margin-top:15px; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="f-usd" style="width:18px; height:18px;"> <label style="font-size:14px;">Es un activo en Dólares (USD)</label></div>`;
     } else if (type === 'budget') {
+        titleEl.textContent = "Nuevo Presupuesto";
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
+        titleEl.textContent = "Registrar Compra (TC)";
         fields.innerHTML = `
             <select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
             <input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)">
@@ -220,10 +220,10 @@ window.toggleForm = (type = null) => {
             <p style="font-size:11px; opacity:0.7; margin-top:10px;">A 1 cuota: 0% interés. A más cuotas: 28.17% EA.</p>
         `;
     } else if (type === 'edit-cc-limit') {
-        document.getElementById("form-title").textContent = "Ajustar Tarjeta";
+        titleEl.textContent = "Ajustar Cupo";
         let actualLimit = creditCards.length > 0 ? creditCards[0].limit : 0;
         fields.innerHTML = `
-            <p style="font-size:12px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta.</p>
+            <p style="font-size:14px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta de crédito.</p>
             <input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">
         `;
     }
@@ -280,3 +280,103 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
                 await addDoc(collection(db, "creditCards"), { userId: currentUser.uid, limit: parseFloat(fAmount.value), createdAt: Date.now() });
             }
         } else if (activeFormType === 'wealth') {
+            let amt = parseFloat(fAmount.value);
+            if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
+            const [name, icon] = fType.value.split('|');
+            data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
+            if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
+            else await addDoc(collection(db, "wealth"), data);
+
+        } else if (activeFormType === 'transaction') {
+            const cat = fCat.value;
+            const amt = parseFloat(fAmount.value);
+            data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
+            
+            if (cat === "Emergencia") {
+                let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
+                if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
+            }
+            
+            if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
+            else await addDoc(collection(db, "transactions"), data);
+
+        } else if (activeFormType === 'cc-transaction') {
+            const cuotas = parseInt(document.getElementById("f-cuotas").value) || 1;
+            const originalAmount = parseFloat(fAmount.value);
+            let totalDebtWithInterests = originalAmount;
+
+            if (cuotas > 1) {
+                const EA = 0.2817; 
+                const TM = Math.pow(1 + EA, 1 / 12) - 1; 
+                const cuotaMensual = (originalAmount * TM * Math.pow(1 + TM, cuotas)) / (Math.pow(1 + TM, cuotas) - 1);
+                totalDebtWithInterests = cuotaMensual * cuotas;
+            }
+
+            data = { ...data, category: fCat.value, amount: originalAmount, cuotas: cuotas, totalDebt: totalDebtWithInterests, description: document.getElementById("f-desc").value, month: currentMonth };
+            
+            if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
+            else await addDoc(collection(db, "ccTransactions"), data);
+        } else if (activeFormType === 'budget') {
+            data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value) };
+            if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
+            else await addDoc(collection(db, "budgets"), data);
+        }
+        
+        window.toggleForm();
+    } catch (error) {
+        alert("Hubo un error al guardar: " + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+    }
+});
+
+// --- ELIMINAR ---
+document.getElementById("btnDeleteForm").addEventListener("click", async () => {
+    if (!editingId) return;
+    
+    let collectionName = '';
+    if (activeFormType === 'transaction') collectionName = 'transactions';
+    else if (activeFormType === 'budget') collectionName = 'budgets';
+    else if (activeFormType === 'wealth') collectionName = 'wealth';
+    else if (activeFormType === 'cc-transaction') collectionName = 'ccTransactions';
+
+    try {
+        await deleteDoc(doc(db, collectionName, editingId));
+        window.toggleForm(); 
+        window.closeFilteredTransactionsModal(); 
+    } catch (e) {
+        alert("Error al intentar eliminar: " + e.message);
+    }
+});
+
+// --- GRÁFICOS ---
+window.openChartModal = () => {
+    document.getElementById("modal-chart").classList.add('active');
+    const ctx = document.getElementById('monthlyChart').getContext('2d');
+    let expByCategory = {};
+    transactions.filter(t => t.type === 'expense' && t.month === currentMonth).forEach(t => {
+        expByCategory[t.category] = (expByCategory[t.category] || 0) + t.amount;
+    });
+
+    if(myChart) myChart.destroy();
+    myChart = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: Object.keys(expByCategory),
+            datasets: [{
+                data: Object.values(expByCategory),
+                backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6'],
+                borderWidth: 0
+            }]
+        },
+        options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-main)' } } } }
+    });
+};
+window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
+
+window.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('active');
+    }
+});
