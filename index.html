@@ -6,14 +6,14 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    <title>Finanzas Casa</title>
-    <link rel="stylesheet" href="style.css?v=2">
+    <title>Liquid Finance</title>
+    <link rel="stylesheet" href="style.css?v=3">
     <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
     <div id="app-container">
-        
         <div class="glass-panel" id="auth-panel">
             <h2>Liquid Finance</h2>
             <p style="opacity: 0.6; margin-bottom: 20px;">Acceso Seguro</p>
@@ -26,36 +26,39 @@
             <input type="email" id="email" class="glass-input" placeholder="Correo electrónico">
             <input type="password" id="password" class="glass-input" placeholder="Contraseña">
             
-            <div id="captcha-container" style="display: none; margin-top: 15px; text-align: left;">
-                <p style="font-size: 13px; color: #a4b4b9; margin-bottom: 5px;">Verificación de seguridad:</p>
+            <div id="captcha-container" style="display: none; margin-top: 15px;">
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 5px;">Seguridad:</p>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span id="captcha-question" style="font-weight: bold; font-size: 18px;">? + ? =</span>
-                    <input type="number" id="captcha-answer" class="glass-input" style="margin-top: 0; width: 80px;" placeholder="Total">
+                    <input type="number" id="captcha-answer" class="glass-input" style="margin-top: 0; width: 80px;">
                 </div>
             </div>
 
             <button id="btnLogin" class="glass-btn">Iniciar Sesión</button>
-            <button id="btnRegister" class="glass-btn secondary">Crear Cuenta Nueva</button>
-            <button id="btnSubmitRegister" class="glass-btn" style="display: none; background: #4ca39b;">Confirmar Registro</button>
-            <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver al Login</button>
-
-            <p id="error-message" style="color: #ff8a8a; margin-top: 15px; font-size: 14px; display: none;"></p>
+            <button id="btnRegister" class="glass-btn secondary">Crear Cuenta</button>
+            <button id="btnSubmitRegister" class="glass-btn" style="display: none; background: #4ca39b;">Confirmar</button>
+            <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver</button>
+            <p id="error-message" style="color: #ff8a8a; margin-top: 15px; display: none;"></p>
         </div>
 
         <div id="dashboard-panel" style="display: none;">
             
-            <div class="view-container active" id="view-home">
-                <div class="top-header">
-                    <div class="user-info">
-                        <div class="avatar"><i data-lucide="user"></i></div>
-                        <span id="user-display">Usuario</span>
-                    </div>
+            <div class="top-header">
+                <div class="user-info">
+                    <div class="avatar"><i data-lucide="user"></i></div>
+                    <span id="user-display">Usuario</span>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 40px; width: 140px;">
+                    <button id="btnThemeToggle" class="icon-btn"><i data-lucide="sun"></i></button>
                     <button id="btnLogout" class="icon-btn"><i data-lucide="log-out"></i></button>
                 </div>
+            </div>
 
+            <div class="view-container active" id="view-home">
                 <div class="balance-display">
                     <h1 id="total-balance">$0</h1>
-                    <p class="subtitle">Saldo Total Disponible</p>
+                    <p class="subtitle" id="rollover-indicator">Saldo Total Disponible</p>
                 </div>
 
                 <div class="cards-scroller">
@@ -65,26 +68,37 @@
 
                 <div class="quick-actions">
                     <button onclick="toggleForm('transaction')"><div class="icon-circle"><i data-lucide="plus"></i></div><span>Movimiento</span></button>
-                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="landmark"></i></div><span>Bolsillos</span></button>
-                    <button onclick="showView('budgets')"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Metas</span></button>
+                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Bolsillos</span></button>
+                    <button onclick="openChartModal()"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Gráficos</span></button>
                 </div>
 
                 <div class="last-operations glass-box">
-                    <div class="section-head"><h3>Últimos movimientos</h3></div>
+                    <div class="section-head"><h3>Movimientos del Mes</h3></div>
                     <div id="transaction-list" class="item-list"></div>
                 </div>
             </div>
 
             <div class="view-container" id="view-budgets">
-                <h3 class="view-title">Presupuestos Mensuales</h3>
+                <h3 class="view-title">Presupuestos</h3>
                 <div id="budget-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn" onclick="toggleForm('budget')"><i data-lucide="plus"></i></button>
+            </div>
+
+            <div class="view-container" id="view-credit">
+                <h3 class="view-title">Tarjeta de Crédito</h3>
+                <div class="glass-box" style="margin-bottom: 20px; background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white;">
+                    <p style="opacity: 0.8; font-size: 12px;">DEUDA ACTUAL</p>
+                    <h1 id="cc-debt" style="font-size: 32px; margin: 5px 0;">$0</h1>
+                    <p style="font-size: 12px;">Cupo Disponible: <span id="cc-available">$0</span></p>
+                </div>
+                <div id="cc-transactions-list" class="item-list glass-box"></div>
+                <button class="floating-action-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
             </div>
 
             <div class="view-container" id="view-wealth">
                 <h3 class="view-title">Mi Portafolio</h3>
                 <h1 id="total-wealth-value" class="massive-balance">$0</h1>
-                <p style="text-align: center; color: #a4b4b9; margin-bottom: 20px;">Tus fondos de emergencia, CDT y activos</p>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Tus fondos y activos (TRM hoy: <span id="trm-display">Cargando...</span>)</p>
                 <div id="wealth-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
             </div>
@@ -92,6 +106,7 @@
             <nav class="bottom-nav">
                 <button class="nav-item active" onclick="showView('home')"><i data-lucide="home"></i></button>
                 <button class="nav-item" onclick="showView('budgets')"><i data-lucide="target"></i></button>
+                <button class="nav-item" onclick="showView('credit')"><i data-lucide="credit-card"></i></button>
                 <button class="nav-item" onclick="showView('wealth')"><i data-lucide="briefcase"></i></button>
             </nav>
         </div>
@@ -103,11 +118,20 @@
                     <button class="close-btn" onclick="toggleForm()"><i data-lucide="x"></i></button>
                 </div>
                 <div id="form-fields"></div>
-                
                 <div class="modal-actions">
-                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(244, 63, 94, 0.2); color: #ff8a8a; border: none;">Eliminar</button>
+                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(244, 63, 94, 0.2); color: #ef4444; border: none;">Eliminar</button>
                     <button class="glass-btn" id="btnSubmitForm">Guardar</button>
                 </div>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="modal-chart">
+            <div class="modal-content glass-box">
+                <div class="modal-header">
+                    <h4>Análisis Mensual</h4>
+                    <button class="close-btn" onclick="document.getElementById('modal-chart').classList.remove('active')"><i data-lucide="x"></i></button>
+                </div>
+                <canvas id="monthlyChart"></canvas>
             </div>
         </div>
 
