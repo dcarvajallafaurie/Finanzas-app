@@ -7,15 +7,15 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>Liquid Finance</title>
-    <link rel="stylesheet" href="style.css?v=6">
+    <link rel="stylesheet" href="style.css?v=7">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
     <div id="app-container">
-        <div class="glass-panel" id="auth-panel">
-            <h2>Liquid Finance</h2>
+        <div class="glass-panel fade-in" id="auth-panel">
+            <h2 class="app-title">Liquid Finance</h2>
             <p style="opacity: 0.6; margin-bottom: 20px;">Acceso Seguro</p>
             
             <div id="register-fields" style="display: none;">
@@ -34,9 +34,9 @@
                 </div>
             </div>
 
-            <button id="btnLogin" class="glass-btn">Iniciar Sesión</button>
+            <button id="btnLogin" class="glass-btn pulse-btn">Iniciar Sesión</button>
             <button id="btnRegister" class="glass-btn secondary">Crear Cuenta</button>
-            <button id="btnSubmitRegister" class="glass-btn" style="display: none; background: #4ca39b;">Confirmar</button>
+            <button id="btnSubmitRegister" class="glass-btn pulse-btn" style="display: none; background: #4ca39b;">Confirmar</button>
             <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver</button>
             <p id="error-message" style="color: #ff8a8a; margin-top: 15px; display: none;"></p>
         </div>
@@ -46,30 +46,39 @@
             <div class="top-header">
                 <div class="user-info">
                     <div class="avatar"><i data-lucide="user"></i></div>
-                    <span id="user-display">Usuario</span>
+                    <div>
+                        <span id="user-display" style="font-weight: 600; display: block;">Usuario</span>
+                        <span id="full-date-display" style="font-size: 11px; color: var(--text-muted); text-transform: capitalize;">Cargando fecha...</span>
+                    </div>
                 </div>
-                <div style="display: flex; gap: 10px;">
-                    <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 40px; width: 140px;">
+                <div style="display: flex; gap: 8px;">
+                    <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 35px; width: 40px; color: transparent; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2381949a%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect x=%223%22 y=%224%22 width=%2218%22 height=%2218%22 rx=%222%22 ry=%222%22></rect><line x1=%2216%22 y1=%222%22 x2=%2216%22 y2=%226%22></line><line x1=%228%22 y1=%222%22 x2=%228%22 y2=%226%22></line><line x1=%223%22 y1=%2210%22 x2=%2221%22 y2=%2210%22></line></svg>'); background-repeat: no-repeat; background-position: center; cursor: pointer;">
                     <button id="btnThemeToggle" class="icon-btn"><i data-lucide="sun"></i></button>
                     <button id="btnLogout" class="icon-btn"><i data-lucide="log-out"></i></button>
                 </div>
             </div>
 
-            <div class="view-container active" id="view-home">
+            <div class="view-container active fade-in" id="view-home">
                 <div class="balance-display">
-                    <h1 id="total-balance">$0</h1>
-                    <p class="subtitle" id="rollover-indicator">Saldo Total Disponible</p>
+                    <p class="subtitle" id="rollover-indicator" style="margin-bottom: 5px;">Saldo Total Disponible</p>
+                    <h1 id="total-balance" style="font-size: 42px;">$0</h1>
                 </div>
 
                 <div class="cards-scroller">
-                    <div class="summary-card income-card" id="income-summary"><i data-lucide="trending-up"></i><div><p>Ingresos</p><h3 id="total-income">+$0</h3></div></div>
-                    <div class="summary-card expense-card" id="expense-summary"><i data-lucide="trending-down"></i><div><p>Egresos</p><h3 id="total-expense">-$0</h3></div></div>
+                    <div class="summary-card income-card" id="income-summary">
+                        <div class="card-icon"><i data-lucide="arrow-up-right"></i></div>
+                        <div><p>Ingresos</p><h3 id="total-income">+$0</h3></div>
+                    </div>
+                    <div class="summary-card expense-card" id="expense-summary">
+                        <div class="card-icon"><i data-lucide="arrow-down-left"></i></div>
+                        <div><p>Egresos</p><h3 id="total-expense">-$0</h3></div>
+                    </div>
                 </div>
 
                 <div class="quick-actions">
-                    <button onclick="toggleForm('transaction')"><div class="icon-circle"><i data-lucide="plus"></i></div><span>Movimiento</span></button>
+                    <button onclick="toggleForm('transaction')"><div class="icon-circle gradient-bg"><i data-lucide="plus"></i></div><span>Añadir</span></button>
                     <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Bolsillos</span></button>
-                    <button onclick="openChartModal()"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Gráficos</span></button>
+                    <button onclick="openChartModal()"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Análisis</span></button>
                 </div>
 
                 <div class="last-operations glass-box">
@@ -78,37 +87,31 @@
                 </div>
             </div>
 
-            <div class="view-container" id="view-budgets">
+            <div class="view-container fade-in" id="view-budgets">
                 <h3 class="view-title">Presupuestos</h3>
                 <div id="budget-list" class="item-list glass-box"></div>
-                <button class="floating-action-btn" onclick="toggleForm('budget')"><i data-lucide="plus"></i></button>
+                <button class="floating-action-btn pulse-btn" onclick="toggleForm('budget')"><i data-lucide="plus"></i></button>
             </div>
 
-            <div class="view-container" id="view-credit">
+            <div class="view-container fade-in" id="view-credit">
                 <h3 class="view-title">Tarjeta de Crédito</h3>
-                
-                <div class="glass-box" style="margin-bottom: 15px; background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white;">
-                    <p style="opacity: 0.8; font-size: 12px; margin-bottom: 5px;">DEUDA TOTAL ACUMULADA</p>
-                    <h1 id="cc-debt" style="font-size: 32px; margin: 5px 0;">$0</h1>
-                    <p style="font-size: 12px; opacity: 0.9;">Cupo Disponible: <span id="cc-available" style="font-weight: bold;">$0</span></p>
+                <div class="glass-box cc-hero-card">
+                    <button onclick="toggleForm('edit-cc-limit')" class="cc-edit-btn"><i data-lucide="edit-2"></i></button>
+                    <p class="cc-label">DEUDA TOTAL ACUMULADA</p>
+                    <h1 id="cc-debt" class="cc-balance">$0</h1>
+                    <p class="cc-limit">Cupo Disponible: <span id="cc-available">$0</span></p>
                 </div>
-                
-                <button onclick="toggleForm('edit-cc-limit')" class="glass-btn secondary" style="margin-top: 0; margin-bottom: 25px; border: 1px dashed var(--text-muted); color: var(--text-muted);">
-                    <i data-lucide="settings" style="width: 18px; margin-right: 8px; vertical-align: middle;"></i> Configurar Cupo Máximo
-                </button>
-
-                <div class="section-head"><h3>Movimientos de la Tarjeta</h3></div>
+                <div class="section-head"><h3>Movimientos a Crédito</h3></div>
                 <div id="cc-transactions-list" class="item-list glass-box"></div>
-                
-                <button class="floating-action-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
+                <button class="floating-action-btn pulse-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
             </div>
 
-            <div class="view-container" id="view-wealth">
+            <div class="view-container fade-in" id="view-wealth">
                 <h3 class="view-title">Mi Portafolio</h3>
                 <h1 id="total-wealth-value" class="massive-balance">$0</h1>
-                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Tus fondos y activos (TRM hoy: <span id="trm-display">Cargando...</span>)</p>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Tus activos (TRM hoy: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">Cargando...</span>)</p>
                 <div id="wealth-list" class="item-list glass-box"></div>
-                <button class="floating-action-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
+                <button class="floating-action-btn pulse-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
             </div>
 
             <nav class="bottom-nav">
@@ -120,31 +123,40 @@
         </div>
 
         <div class="modal-overlay" id="modal-form">
-            <div class="modal-content glass-box">
+            <div class="modal-content glass-box slide-up">
                 <div class="modal-header">
                     <h4 id="form-title">Cargando...</h4>
                     <button class="close-btn" onclick="toggleForm()"><i data-lucide="x"></i></button>
                 </div>
                 <div id="form-fields"></div>
-                <div class="modal-actions">
-                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(244, 63, 94, 0.2); color: #ef4444; border: none;">Eliminar</button>
-                    <button class="glass-btn" id="btnSubmitForm">Guardar</button>
+                <div class="modal-actions" style="margin-top: 15px; display: flex; gap: 10px;">
+                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Eliminar</button>
+                    <button class="glass-btn pulse-btn" id="btnSubmitForm" style="background: var(--accent-gradient); border:none; flex-grow:1;">Guardar</button>
                 </div>
             </div>
         </div>
 
         <div class="modal-overlay" id="modal-chart">
-            <div class="modal-content glass-box">
+            <div class="modal-content glass-box slide-up">
                 <div class="modal-header">
-                    <h4>Análisis Mensual</h4>
+                    <h4>Análisis de Egresos</h4>
                     <button class="close-btn" onclick="closeChartModal()"><i data-lucide="x"></i></button>
                 </div>
-                <canvas id="monthlyChart"></canvas>
+                
+                <div class="chart-wrapper">
+                    <canvas id="monthlyChart"></canvas>
+                    <div class="chart-center-info">
+                        <p>Total Gastado</p>
+                        <h3 id="chart-total-expense">$0</h3>
+                    </div>
+                </div>
+                
+                <div id="custom-legend" class="custom-legend-container"></div>
             </div>
         </div>
 
         <div class="modal-overlay" id="modal-filtered-transactions">
-            <div class="modal-content glass-box">
+            <div class="modal-content glass-box slide-up">
                 <div class="modal-header">
                     <h4 id="filtered-transactions-title">Movimientos</h4>
                     <button class="close-btn" onclick="closeFilteredTransactionsModal()"><i data-lucide="x"></i></button>

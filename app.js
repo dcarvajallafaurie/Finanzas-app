@@ -2,39 +2,43 @@ import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthState
 import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { auth, db } from "./firebaseConfig.js";
 
-// --- VARIABLES GLOBALES Y ESTADO ---
 let budgets = [], transactions = [], wealth = [], creditCards = [], ccTransactions = [];
 let activeFormType = null, editingId = null, currentUser = null;
 let currentMonth = new Date().toISOString().slice(0, 7); 
 let TRM = 3900; 
 let myChart = null;
 
+// Paleta de colores para gráficos
+const chartColors = ['#ef4444', '#3b82f6', '#f59e0b', '#10b981', '#8b5cf6', '#06b6d4', '#ec4899'];
+
 const CATEGORIES = {
     budget: ["Alimentación", "Transporte", "Servicios", "Entretenimiento", "Salud", "Otras categorías"],
     transaction: {
         "Salario": "income", "Ventas": "income", "Regalos": "income", "Rendimientos": "income",
         "Alimentación": "expense", "Transporte": "expense", "Servicios": "expense", "Entretenimiento": "expense", "Salud": "expense", "Compras": "expense", "Otras categorías": "expense",
-        "Emergencia": "expense", 
-        "Pago Tarjeta": "expense" 
+        "Emergencia": "expense", "Pago Tarjeta": "expense" 
     },
     wealthIcons: [
-        { name: "Fondo de Emergencia", icon: "shield" },
-        { name: "CDT", icon: "lock" },
-        { name: "Ahorro Programado", icon: "piggy-bank" },
-        { name: "Finca Raíz", icon: "home" },
-        { name: "Acciones / Inversión", icon: "trending-up" },
-        { name: "Otro Activo", icon: "briefcase" }
+        { name: "Fondo de Emergencia", icon: "shield" }, { name: "CDT", icon: "lock" }, { name: "Ahorro Programado", icon: "piggy-bank" },
+        { name: "Finca Raíz", icon: "home" }, { name: "Acciones / Inversión", icon: "trending-up" }, { name: "Otro Activo", icon: "briefcase" }
     ]
 };
 
-// --- INICIALIZACIÓN ---
+// --- FECHA DINÁMICA ---
+function formatearFechaHoy() {
+    const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+    const fechaActual = new Date();
+    return fechaActual.toLocaleDateString('es-CO', opciones); // Formato local Colombia
+}
+document.getElementById("full-date-display").textContent = formatearFechaHoy();
+
 document.getElementById("month-selector").value = currentMonth;
 document.getElementById("month-selector").addEventListener("change", (e) => {
     currentMonth = e.target.value;
     actualizarDatosUI();
 });
 
-fetch('https://open.er-api.com/v6/latest/USD').then(res => res.json()).then(data => {
+fetch('https://open.er-api.com/v6/latest/USD').then(r => r.json()).then(data => {
     TRM = data.rates.COP;
     document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)} COP`;
 }).catch(e => console.log("Error TRM"));
@@ -43,7 +47,7 @@ document.getElementById("btnThemeToggle").addEventListener("click", () => docume
 
 function formatMoney(amount) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount); }
 
-// --- AUTH ---
+// --- AUTH Y CAPTCHA ---
 let captchaCorrect = 0;
 document.getElementById("btnRegister").addEventListener("click", () => {
     document.getElementById("btnLogin").style.display = "none";
@@ -80,7 +84,7 @@ onAuthStateChanged(auth, (user) => {
         currentUser = user;
         document.getElementById("auth-panel").style.display = "none";
         document.getElementById("dashboard-panel").style.display = "flex";
-        document.getElementById("user-display").textContent = user.displayName || user.email.split('@')[0];
+        document.getElementById("user-display").textContent = `Hola, ${user.displayName ? user.displayName.split(' ')[0] : user.email.split('@')[0]}`;
         cargarDatos();
         window.showView('home'); 
     } else {
@@ -113,16 +117,13 @@ function actualizarDatosUI() {
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth);
     let incMonth = currentMonthTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expMonth = currentMonthTrans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    
     const pastTrans = transactions.filter(t => t.month < currentMonth);
     const rollover = pastTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0) - pastTrans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     
     if (rollover > 0) {
         incMonth += rollover; 
-        document.getElementById("rollover-indicator").textContent = `Saldo Disponible (+${formatMoney(rollover)} del mes pasado)`;
-    } else {
-        document.getElementById("rollover-indicator").textContent = "Saldo Total Disponible";
-    }
+        document.getElementById("rollover-indicator").textContent = `Saldo (+${formatMoney(rollover)} del mes pasado)`;
+    } else { document.getElementById("rollover-indicator").textContent = "Saldo Total Disponible"; }
 
     document.getElementById("total-income").textContent = `+${formatMoney(incMonth)}`;
     document.getElementById("total-expense").textContent = `-${formatMoney(expMonth)}`;
@@ -151,21 +152,18 @@ function actualizarDatosUI() {
         wList.innerHTML += `<div class="item-card" onclick="openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatMoney(w.amount)}</div></div>`;
     });
 
-    // LÓGICA DE TARJETA DE CRÉDITO
     if(creditCards.length > 0) {
         let cc = creditCards[0];
         let totalCCDebtGenerated = ccTransactions.reduce((s,t) => s + (t.totalDebt || t.amount), 0);
         let totalCCPayments = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s,t) => s + t.amount, 0);
-        
         let currentDebt = Math.max(0, totalCCDebtGenerated - totalCCPayments);
-        
         document.getElementById("cc-debt").textContent = formatMoney(currentDebt);
         document.getElementById("cc-available").textContent = formatMoney(cc.limit - currentDebt);
         
         const ccList = document.getElementById("cc-transactions-list");
         ccList.innerHTML = '';
         ccTransactions.filter(t=> t.month === currentMonth).forEach(t => {
-            let cuotasInfo = t.cuotas > 1 ? `<span style="color:#ef4444; font-weight:bold;">(${t.cuotas} cuotas - Total pagado será: ${formatMoney(t.totalDebt)})</span>` : '';
+            let cuotasInfo = t.cuotas > 1 ? `<span style="color:#f43f5e; font-weight:bold;">(${t.cuotas} cuotas - Total pagado será: ${formatMoney(t.totalDebt)})</span>` : '';
             ccList.innerHTML += `<div class="item-card" onclick="openEditForm('cc-transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description} ${cuotasInfo}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
         });
     }
@@ -174,17 +172,16 @@ function actualizarDatosUI() {
 
 window.openFilteredTransactionsModal = (type) => {
     document.getElementById("modal-filtered-transactions").classList.add('active');
-    document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Ingresos' : 'Egresos';
+    document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Total Ingresos' : 'Total Egresos';
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth && t.type === type);
     const container = document.getElementById("filtered-transactions-list");
-    container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:#6a7c82; font-size:14px;">No hay movimientos este mes.</p>`;
+    container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">No hay movimientos registrados.</p>`;
     currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
         let isInc = t.type === 'income';
         container.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
     });
     lucide.createIcons();
 }
-
 window.closeFilteredTransactionsModal = () => document.getElementById("modal-filtered-transactions").classList.remove('active');
 document.getElementById("income-summary").addEventListener("click", () => window.openFilteredTransactionsModal('income'));
 document.getElementById("expense-summary").addEventListener("click", () => window.openFilteredTransactionsModal('expense'));
@@ -194,46 +191,33 @@ window.toggleForm = (type = null) => {
     activeFormType = type;
     editingId = null;
     document.getElementById("btnDeleteForm").style.display = 'none';
-
     if (!type) return document.getElementById("modal-form").classList.remove('active');
     
     document.getElementById("modal-form").classList.add('active');
-    const fields = document.getElementById("form-fields");
-    const titleEl = document.getElementById("form-title");
+    const fields = document.getElementById("form-fields"), titleEl = document.getElementById("form-title");
     
     if (type === 'transaction') {
         titleEl.textContent = "Nuevo Movimiento";
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     } else if (type === 'wealth') {
         titleEl.textContent = "Añadir a Portafolio";
-        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><input type="number" id="f-amount" class="glass-input" placeholder="Monto actual ($)"><div style="margin-top:15px; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="f-usd" style="width:18px; height:18px;"> <label style="font-size:14px;">Es un activo en Dólares (USD)</label></div>`;
+        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre (Ej. Banco de Bogotá)"><input type="number" id="f-amount" class="glass-input" placeholder="Monto actual ($)"><div style="margin-top:15px; display:flex; align-items:center; gap:8px;"><input type="checkbox" id="f-usd" style="width:18px; height:18px;"> <label style="font-size:14px;">Es un activo en Dólares (USD)</label></div>`;
     } else if (type === 'budget') {
         titleEl.textContent = "Nuevo Presupuesto";
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
-        titleEl.textContent = "Registrar Compra (TC)";
-        fields.innerHTML = `
-            <select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>
-            <input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)">
-            <input type="number" id="f-cuotas" class="glass-input" placeholder="Número de cuotas (Ej: 1)" value="1" min="1">
-            <textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>
-            <p style="font-size:11px; opacity:0.7; margin-top:10px;">A 1 cuota: 0% interés. A más cuotas: 28.17% EA.</p>
-        `;
+        titleEl.textContent = "Compra a Crédito";
+        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor de la compra ($)"><input type="number" id="f-cuotas" class="glass-input" placeholder="Número de cuotas" value="1" min="1"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea><p style="font-size:12px; opacity:0.7; margin-top:10px;">A más de 1 cuota se aplica 28.17% EA de interés.</p>`;
     } else if (type === 'edit-cc-limit') {
         titleEl.textContent = "Ajustar Cupo";
         let actualLimit = creditCards.length > 0 ? creditCards[0].limit : 0;
-        fields.innerHTML = `
-            <p style="font-size:14px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta de crédito.</p>
-            <input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">
-        `;
+        fields.innerHTML = `<p style="font-size:14px; margin-bottom:10px;">Define el cupo total máximo de tu tarjeta.</p><input type="number" id="f-amount" class="glass-input" placeholder="Cupo Total ($)" value="${actualLimit}">`;
     }
 };
 
 window.openEditForm = (type, id) => {
     window.toggleForm(type);
-    editingId = id; 
-    document.getElementById("btnDeleteForm").style.display = 'block'; 
-    
+    editingId = id; document.getElementById("btnDeleteForm").style.display = 'block'; 
     let item;
     if (type === 'wealth') item = wealth.find(i => i.id === id);
     else if (type === 'transaction') item = transactions.find(i => i.id === id);
@@ -241,142 +225,94 @@ window.openEditForm = (type, id) => {
     else if (type === 'budget') item = budgets.find(i => i.id === id);
 
     if (item) {
-        if (type === 'wealth') {
-            document.getElementById("f-type").value = `${item.name}|${item.icon}`;
-            document.getElementById("f-amount").value = item.amount;
-            document.getElementById("f-desc").value = item.description || "";
-        } else {
-            document.getElementById("f-cat").value = item.category;
-            document.getElementById("f-amount").value = item.amount;
-            if (document.getElementById("f-desc")) document.getElementById("f-desc").value = item.description || "";
-        }
+        if (type === 'wealth') { document.getElementById("f-type").value = `${item.name}|${item.icon}`; document.getElementById("f-amount").value = item.amount; document.getElementById("f-desc").value = item.description || ""; } 
+        else { document.getElementById("f-cat").value = item.category; document.getElementById("f-amount").value = item.amount; if (document.getElementById("f-desc")) document.getElementById("f-desc").value = item.description || ""; }
     }
 };
 
-// --- GUARDAR ---
+// --- GUARDAR Y ELIMINAR ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
+    const fCat = document.getElementById("f-cat"), fAmount = document.getElementById("f-amount"), fType = document.getElementById("f-type");
+    if ((fCat && !fCat.value) || (fType && !fType.value) || (fAmount && !fAmount.value)) return alert("Llena los campos requeridos.");
     
-    const fCat = document.getElementById("f-cat");
-    const fAmount = document.getElementById("f-amount");
-    const fType = document.getElementById("f-type");
-
-    if ((fCat && !fCat.value) || (fType && !fType.value) || (fAmount && !fAmount.value)) {
-        alert("Por favor, llena los campos requeridos.");
-        return;
-    }
-
-    const btn = document.getElementById("btnSubmitForm");
-    btn.disabled = true;
-    btn.textContent = "Guardando...";
-
+    const btn = document.getElementById("btnSubmitForm"); btn.disabled = true; btn.textContent = "Guardando...";
     try {
         let data = { userId: currentUser.uid, createdAt: Date.now() };
-
         if (activeFormType === 'edit-cc-limit') {
-            if (creditCards.length > 0) {
-                await updateDoc(doc(db, "creditCards", creditCards[0].id), { limit: parseFloat(fAmount.value) });
-            } else {
-                await addDoc(collection(db, "creditCards"), { userId: currentUser.uid, limit: parseFloat(fAmount.value), createdAt: Date.now() });
-            }
+            if (creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { limit: parseFloat(fAmount.value) });
+            else await addDoc(collection(db, "creditCards"), { userId: currentUser.uid, limit: parseFloat(fAmount.value), createdAt: Date.now() });
         } else if (activeFormType === 'wealth') {
             let amt = parseFloat(fAmount.value);
             if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
             const [name, icon] = fType.value.split('|');
             data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
-            if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
-            else await addDoc(collection(db, "wealth"), data);
-
+            if(editingId) await updateDoc(doc(db, "wealth", editingId), data); else await addDoc(collection(db, "wealth"), data);
         } else if (activeFormType === 'transaction') {
-            const cat = fCat.value;
-            const amt = parseFloat(fAmount.value);
+            const cat = fCat.value, amt = parseFloat(fAmount.value);
             data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
-            
-            if (cat === "Emergencia") {
-                let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
-                if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
-            }
-            
-            if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
-            else await addDoc(collection(db, "transactions"), data);
-
+            if (cat === "Emergencia") { let fondo = wealth.find(w => w.name === "Fondo de Emergencia"); if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt }); }
+            if(editingId) await updateDoc(doc(db, "transactions", editingId), data); else await addDoc(collection(db, "transactions"), data);
         } else if (activeFormType === 'cc-transaction') {
             const cuotas = parseInt(document.getElementById("f-cuotas").value) || 1;
             const originalAmount = parseFloat(fAmount.value);
             let totalDebtWithInterests = originalAmount;
-
-            if (cuotas > 1) {
-                const EA = 0.2817; 
-                const TM = Math.pow(1 + EA, 1 / 12) - 1; 
-                const cuotaMensual = (originalAmount * TM * Math.pow(1 + TM, cuotas)) / (Math.pow(1 + TM, cuotas) - 1);
-                totalDebtWithInterests = cuotaMensual * cuotas;
-            }
-
+            if (cuotas > 1) { const TM = Math.pow(1 + 0.2817, 1 / 12) - 1; const cuotaMensual = (originalAmount * TM * Math.pow(1 + TM, cuotas)) / (Math.pow(1 + TM, cuotas) - 1); totalDebtWithInterests = cuotaMensual * cuotas; }
             data = { ...data, category: fCat.value, amount: originalAmount, cuotas: cuotas, totalDebt: totalDebtWithInterests, description: document.getElementById("f-desc").value, month: currentMonth };
-            
-            if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
-            else await addDoc(collection(db, "ccTransactions"), data);
+            if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data); else await addDoc(collection(db, "ccTransactions"), data);
         } else if (activeFormType === 'budget') {
             data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value) };
-            if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
-            else await addDoc(collection(db, "budgets"), data);
+            if(editingId) await updateDoc(doc(db, "budgets", editingId), data); else await addDoc(collection(db, "budgets"), data);
         }
-        
         window.toggleForm();
-    } catch (error) {
-        alert("Hubo un error al guardar: " + error.message);
-    } finally {
-        btn.disabled = false;
-        btn.textContent = "Guardar";
-    }
+    } catch (e) { alert("Error: " + e.message); } finally { btn.disabled = false; btn.textContent = "Guardar"; }
 });
 
-// --- ELIMINAR ---
 document.getElementById("btnDeleteForm").addEventListener("click", async () => {
     if (!editingId) return;
-    
-    let collectionName = '';
-    if (activeFormType === 'transaction') collectionName = 'transactions';
-    else if (activeFormType === 'budget') collectionName = 'budgets';
-    else if (activeFormType === 'wealth') collectionName = 'wealth';
-    else if (activeFormType === 'cc-transaction') collectionName = 'ccTransactions';
-
-    try {
-        await deleteDoc(doc(db, collectionName, editingId));
-        window.toggleForm(); 
-        window.closeFilteredTransactionsModal(); 
-    } catch (e) {
-        alert("Error al intentar eliminar: " + e.message);
-    }
+    let colName = activeFormType === 'transaction' ? 'transactions' : (activeFormType === 'budget' ? 'budgets' : (activeFormType === 'wealth' ? 'wealth' : 'ccTransactions'));
+    try { await deleteDoc(doc(db, colName, editingId)); window.toggleForm(); window.closeFilteredTransactionsModal(); } catch (e) { alert("Error: " + e.message); }
 });
 
-// --- GRÁFICOS ---
+// --- GRÁFICOS AVANZADOS (ESTILO MONEFY) ---
 window.openChartModal = () => {
     document.getElementById("modal-chart").classList.add('active');
     const ctx = document.getElementById('monthlyChart').getContext('2d');
+    
     let expByCategory = {};
+    let totalExpense = 0;
     transactions.filter(t => t.type === 'expense' && t.month === currentMonth).forEach(t => {
         expByCategory[t.category] = (expByCategory[t.category] || 0) + t.amount;
+        totalExpense += t.amount;
+    });
+
+    document.getElementById("chart-total-expense").textContent = formatMoney(totalExpense);
+    
+    // Generar leyenda HTML personalizada
+    const legendContainer = document.getElementById("custom-legend");
+    legendContainer.innerHTML = '';
+    
+    const categories = Object.keys(expByCategory);
+    const dataValues = Object.values(expByCategory);
+
+    categories.forEach((cat, index) => {
+        let percent = totalExpense > 0 ? Math.round((dataValues[index] / totalExpense) * 100) : 0;
+        let color = chartColors[index % chartColors.length];
+        legendContainer.innerHTML += `
+            <div class="legend-item">
+                <div class="legend-label"><span class="legend-color-box" style="background:${color}"></span>${cat}</div>
+                <div><span class="legend-value">${formatMoney(dataValues[index])}</span><span class="legend-percentage">${percent}%</span></div>
+            </div>
+        `;
     });
 
     if(myChart) myChart.destroy();
     myChart = new Chart(ctx, {
         type: 'doughnut',
-        data: {
-            labels: Object.keys(expByCategory),
-            datasets: [{
-                data: Object.values(expByCategory),
-                backgroundColor: ['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#8b5cf6'],
-                borderWidth: 0
-            }]
-        },
-        options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-main)' } } } }
+        data: { labels: categories, datasets: [{ data: dataValues, backgroundColor: chartColors, borderWidth: 4, borderColor: getComputedStyle(document.body).getPropertyValue('--glass-bg').trim(), hoverOffset: 4, borderRadius: 8 }] },
+        options: { cutout: '78%', plugins: { legend: { display: false }, tooltip: { backgroundColor: 'rgba(0,0,0,0.8)', padding: 12, titleFont: {size: 14}, bodyFont: {size: 14, weight: 'bold'}, displayColors: false, callbacks: { label: function(context) { return formatMoney(context.raw); } } } } }
     });
 };
 window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
 
-window.addEventListener('click', (e) => {
-    if (e.target.classList.contains('modal-overlay')) {
-        e.target.classList.remove('active');
-    }
-});
+window.addEventListener('click', (e) => { if (e.target.classList.contains('modal-overlay')) e.target.classList.remove('active'); });
