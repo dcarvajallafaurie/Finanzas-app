@@ -112,7 +112,7 @@ window.showView = (v) => {
     actualizarDatosUI();
 };
 
-// --- RENDERIZADO (AHORA CON CLICS ACTIVADOS) ---
+// --- RENDERIZADO ---
 function actualizarDatosUI() {
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth);
     let incMonth = currentMonthTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -132,7 +132,6 @@ function actualizarDatosUI() {
     document.getElementById("total-expense").textContent = `-${formatMoney(expMonth)}`;
     document.getElementById("total-balance").textContent = formatMoney(incMonth - expMonth);
 
-    // Tablero (¡Clics agregados aquí!)
     const cList = document.getElementById("transaction-list");
     cList.innerHTML = '';
     currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
@@ -140,7 +139,6 @@ function actualizarDatosUI() {
         cList.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
     });
 
-    // Presupuestos (¡Clics agregados aquí!)
     const bList = document.getElementById("budget-list");
     bList.innerHTML = '';
     budgets.forEach(b => {
@@ -150,7 +148,6 @@ function actualizarDatosUI() {
         bList.innerHTML += `<div class="item-card budget-card" onclick="openEditForm('budget', '${b.id}')"><div class="budget-header"><div class="item-left"><div class="item-icon"><i data-lucide="target"></i></div><div class="item-info"><h5>${b.category}</h5></div></div><div style="font-weight:600;">Límite: ${formatMoney(b.amount)}</div></div><div class="budget-progress-container"><div class="budget-progress-fill ${color}" style="width: ${pct}%;"></div></div><div class="budget-stats"><span>Gastado: ${formatMoney(spent)}</span><span>Restante: ${formatMoney(b.amount - spent)}</span></div></div>`;
     });
 
-    // Patrimonio (Mantenido)
     document.getElementById("total-wealth-value").textContent = formatMoney(wealth.reduce((s, w) => s + w.amount, 0));
     const wList = document.getElementById("wealth-list");
     wList.innerHTML = '';
@@ -158,7 +155,6 @@ function actualizarDatosUI() {
         wList.innerHTML += `<div class="item-card" onclick="openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatMoney(w.amount)}</div></div>`;
     });
 
-    // Tarjeta de Crédito (¡Clics agregados aquí!)
     if(creditCards.length > 0) {
         let cc = creditCards[0];
         let debt = ccTransactions.filter(t=> t.month === currentMonth).reduce((s,t)=> s + t.amount, 0);
@@ -174,7 +170,6 @@ function actualizarDatosUI() {
     lucide.createIcons();
 }
 
-// Modal de Movimientos Filtrados (¡Clics agregados aquí también!)
 window.openFilteredTransactionsModal = (type) => {
     document.getElementById("modal-filtered-transactions").classList.add('active');
     document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Ingresos' : 'Egresos';
@@ -195,6 +190,11 @@ document.getElementById("expense-summary").addEventListener("click", () => windo
 // --- FORMULARIOS ---
 window.toggleForm = (type = null) => {
     activeFormType = type;
+    
+    // SOLUCIÓN 1: Limpiamos la variable de edición y OCULTAMOS el botón de eliminar siempre que se abra el modal
+    editingId = null;
+    document.getElementById("btnDeleteForm").style.display = 'none';
+
     if (!type) return document.getElementById("modal-form").classList.remove('active');
     
     document.getElementById("modal-form").classList.add('active');
@@ -211,11 +211,10 @@ window.toggleForm = (type = null) => {
     }
 };
 
-// Carga la información en el formulario para poder editarla o borrarla
 window.openEditForm = (type, id) => {
     window.toggleForm(type);
-    editingId = id;
-    document.getElementById("btnDeleteForm").style.display = 'block';
+    editingId = id; // Volvemos a asignarlo porque toggleForm lo limpió
+    document.getElementById("btnDeleteForm").style.display = 'block'; // SOLO lo mostramos si estamos editando
     
     let item;
     if (type === 'wealth') item = wealth.find(i => i.id === id);
@@ -236,57 +235,77 @@ window.openEditForm = (type, id) => {
     }
 };
 
-// --- GUARDAR ---
+// --- GUARDAR (AHORA CON PROTECCIÓN ANTI-BLOQUEO) ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
-    document.getElementById("btnSubmitForm").disabled = true;
-    let data = { userId: currentUser.uid, createdAt: Date.now() };
-
-    if (activeFormType === 'wealth') {
-        let amt = parseFloat(document.getElementById("f-amount").value);
-        if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
-        const [name, icon] = document.getElementById("f-type").value.split('|');
-        data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
-        if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
-        else await addDoc(collection(db, "wealth"), data);
-
-    } else if (activeFormType === 'transaction') {
-        const cat = document.getElementById("f-cat").value;
-        const amt = parseFloat(document.getElementById("f-amount").value);
-        data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
-        if (cat === "Emergencia") {
-            let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
-            if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
-        }
-        if (cat === "Pago Tarjeta" && creditCards.length > 0) {
-            let cc = creditCards[0];
-            await updateDoc(doc(db, "creditCards", cc.id), { debt: Math.max(0, cc.debt - amt) });
-        }
-        if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
-        else await addDoc(collection(db, "transactions"), data);
-
-    } else if (activeFormType === 'cc-transaction') {
-        data = { ...data, category: document.getElementById("f-cat").value, amount: parseFloat(document.getElementById("f-amount").value), description: document.getElementById("f-desc").value, month: currentMonth };
-        if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
-        else {
-            await addDoc(collection(db, "ccTransactions"), data);
-            if(creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { debt: creditCards[0].debt + data.amount });
-        }
-    } else if (activeFormType === 'budget') {
-        data = { ...data, category: document.getElementById("f-cat").value, amount: parseFloat(document.getElementById("f-amount").value) };
-        if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
-        else await addDoc(collection(db, "budgets"), data);
-    }
     
-    window.toggleForm();
-    document.getElementById("btnSubmitForm").disabled = false;
+    // Validación básica para evitar que el código explote si falta información
+    const fCat = document.getElementById("f-cat");
+    const fAmount = document.getElementById("f-amount");
+    const fType = document.getElementById("f-type");
+
+    if ((fCat && !fCat.value) || (fType && !fType.value) || (fAmount && !fAmount.value)) {
+        alert("Por favor, llena los campos requeridos.");
+        return;
+    }
+
+    const btn = document.getElementById("btnSubmitForm");
+    btn.disabled = true;
+    btn.textContent = "Guardando...";
+
+    try {
+        let data = { userId: currentUser.uid, createdAt: Date.now() };
+
+        if (activeFormType === 'wealth') {
+            let amt = parseFloat(fAmount.value);
+            if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
+            const [name, icon] = fType.value.split('|');
+            data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
+            if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
+            else await addDoc(collection(db, "wealth"), data);
+
+        } else if (activeFormType === 'transaction') {
+            const cat = fCat.value;
+            const amt = parseFloat(fAmount.value);
+            data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
+            if (cat === "Emergencia") {
+                let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
+                if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
+            }
+            if (cat === "Pago Tarjeta" && creditCards.length > 0) {
+                let cc = creditCards[0];
+                await updateDoc(doc(db, "creditCards", cc.id), { debt: Math.max(0, cc.debt - amt) });
+            }
+            if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
+            else await addDoc(collection(db, "transactions"), data);
+
+        } else if (activeFormType === 'cc-transaction') {
+            data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value), description: document.getElementById("f-desc").value, month: currentMonth };
+            if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
+            else {
+                await addDoc(collection(db, "ccTransactions"), data);
+                if(creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { debt: creditCards[0].debt + data.amount });
+            }
+        } else if (activeFormType === 'budget') {
+            data = { ...data, category: fCat.value, amount: parseFloat(fAmount.value) };
+            if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
+            else await addDoc(collection(db, "budgets"), data);
+        }
+        
+        window.toggleForm(); // Cierra el modal solo si todo salió bien
+    } catch (error) {
+        alert("Hubo un error al guardar: " + error.message);
+    } finally {
+        // SOLUCIÓN 2: Pase lo que pase (éxito o error), devolvemos el botón a la normalidad
+        btn.disabled = false;
+        btn.textContent = "Guardar";
+    }
 });
 
-// --- ELIMINACIÓN CORREGIDA ---
+// --- ELIMINAR ---
 document.getElementById("btnDeleteForm").addEventListener("click", async () => {
     if (!editingId) return;
     
-    // Determina exactamente de qué carpeta de la base de datos se debe borrar
     let collectionName = '';
     if (activeFormType === 'transaction') collectionName = 'transactions';
     else if (activeFormType === 'budget') collectionName = 'budgets';
@@ -295,8 +314,8 @@ document.getElementById("btnDeleteForm").addEventListener("click", async () => {
 
     try {
         await deleteDoc(doc(db, collectionName, editingId));
-        window.toggleForm(); // Cierra el modal después de borrar
-        window.closeFilteredTransactionsModal(); // Por si estaba abierto desde la vista filtrada
+        window.toggleForm(); 
+        window.closeFilteredTransactionsModal(); 
     } catch (e) {
         alert("Error al intentar eliminar: " + e.message);
     }
@@ -326,7 +345,8 @@ window.openChartModal = () => {
     });
 };
 window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
-// Cierra cualquier modal al tocar el fondo oscuro (Modo Premium)
+
+// Cerrar cualquier modal al tocar el fondo oscuro
 window.addEventListener('click', (e) => {
     if (e.target.classList.contains('modal-overlay')) {
         e.target.classList.remove('active');
