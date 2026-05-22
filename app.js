@@ -1,5 +1,5 @@
 import { createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+import { collection, addDoc, deleteDoc, doc, updateDoc, onSnapshot, query, where, getDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 import { auth, db } from "./firebaseConfig.js";
 
 // --- VARIABLES GLOBALES Y ESTADO ---
@@ -91,6 +91,7 @@ onAuthStateChanged(auth, (user) => {
         cargarDatos();
         window.showView('home'); 
     } else {
+        currentUser = null;
         document.getElementById("auth-panel").style.display = "block";
         document.getElementById("dashboard-panel").style.display = "none";
     }
@@ -181,6 +182,28 @@ function actualizarDatosUI() {
     lucide.createIcons();
 }
 
+// --- MODAL DE MOVIMIENTOS FILTRADOS ---
+function openFilteredTransactionsModal(type) {
+    document.getElementById("modal-filtered-transactions").classList.add('active');
+    document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Ingresos' : 'Egresos';
+    const currentMonthTrans = transactions.filter(t => t.month === currentMonth && t.type === type);
+    const container = document.getElementById("filtered-transactions-list");
+    container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:#6a7c82; font-size:14px;">No hay movimientos este mes.</p>`;
+    currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
+        let isInc = t.type === 'income';
+        container.innerHTML += `<div class="item-card"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
+    });
+    lucide.createIcons();
+}
+
+function closeFilteredTransactionsModal() {
+    document.getElementById("modal-filtered-transactions").classList.remove('active');
+}
+
+document.getElementById("income-summary").addEventListener("click", () => openFilteredTransactionsModal('income'));
+document.getElementById("expense-summary").addEventListener("click", () => openFilteredTransactionsModal('expense'));
+
+
 // --- FORMULARIOS ---
 window.toggleForm = (type = null) => {
     activeFormType = type;
@@ -190,13 +213,13 @@ window.toggleForm = (type = null) => {
     const fields = document.getElementById("form-fields");
     
     if (type === 'transaction') {
-        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><input type="text" id="f-desc" class="glass-input" placeholder="Descripción">`;
+        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     } else if (type === 'wealth') {
         fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><div style="display:flex; gap:10px;"><input type="number" id="f-amount" class="glass-input" placeholder="Monto"><div style="margin-top:15px; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="f-usd"> <label style="font-size:12px;">Es USD</label></div></div><p style="font-size:11px; opacity:0.7; margin-top:5px;">Si es USD, se multiplicará por el TRM actual.</p>`;
     } else if (type === 'budget') {
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
-        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor gastado con TC ($)"><input type="text" id="f-desc" class="glass-input" placeholder="Descripción">`;
+        fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría de Gasto</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor gastado con TC ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     }
 };
 
@@ -211,6 +234,10 @@ window.openEditForm = (type, id) => {
         document.getElementById("f-desc").value = item.description || "";
     }
 };
+
+function generarSelect(options, placeholder) {
+    return `<select id="f-cat" class="glass-input"><option value="" disabled selected>${placeholder}</option>${options.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>`;
+}
 
 // --- GUARDAR CON LÓGICA INTELIGENTE (Contabilidad Partida Doble) ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
@@ -261,7 +288,24 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
 
 // --- ELIMINAR ---
 document.getElementById("btnDeleteForm").addEventListener("click", async () => {
-    if(editingId) await deleteDoc(doc(db, "wealth", editingId));
+    if (!editingId) {
+        alert("No hay un elemento seleccionado para eliminar.");
+        return;
+    }
+
+    const collectionName = activeFormType === 'transaction' ? 'transactions' : (activeFormType === 'budget' ? 'budgets' : 'wealth');
+    try {
+        const docRef = doc(db, collectionName, editingId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            await deleteDoc(docRef);
+            alert("Eliminado con éxito.");
+        } else {
+            alert("El elemento ya no existe o no se puede encontrar.");
+        }
+    } catch (e) {
+        alert("Error al intentar eliminar: " + e.message);
+    }
     window.toggleForm();
 });
 
@@ -291,3 +335,7 @@ window.openChartModal = () => {
         options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-main)' } } } }
     });
 };
+
+window.closeChartModal = () => {
+    document.getElementById("modal-chart").classList.remove('active');
+}

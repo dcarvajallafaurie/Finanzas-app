@@ -59,7 +59,8 @@ body { background-color: var(--bg-main); color: var(--text-main); display: flex;
 .balance-display h1 { font-size: 38px; font-weight: 700; }
 .balance-display .subtitle { color: var(--text-muted); font-size: 14px; margin-top: 5px; }
 .cards-scroller { display: flex; gap: 15px; margin-bottom: 25px; }
-.summary-card { flex: 1; padding: 20px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; color: white;}
+.summary-card { flex: 1; padding: 20px; border-radius: 20px; display: flex; flex-direction: column; gap: 15px; color: white; cursor: pointer; transition: transform 0.2s; }
+.summary-card:active { transform: scale(0.98); }
 .summary-card p { font-size: 13px; opacity: 0.8; }
 .summary-card h3 { font-size: 20px; }
 .income-card { background: linear-gradient(145deg, #10b981, #047857); }
@@ -71,8 +72,10 @@ body { background-color: var(--bg-main); color: var(--text-main); display: flex;
 
 /* Listas */
 .section-head h3 { font-size: 16px; color: var(--text-muted); font-weight: 500; margin-bottom: 15px;}
-.item-list { display: flex; flex-direction: column; gap: 15px; }
-.item-card { display: flex; justify-content: space-between; align-items: center; background: transparent; cursor: pointer; padding: 5px 0; border-bottom: 1px solid var(--glass-border); }
+.item-list { display: flex; flex-direction: column; gap: 15px; padding-bottom: 20px; }
+.item-card { display: flex; justify-content: space-between; align-items: center; background: transparent; cursor: pointer; padding: 10px 0; border-bottom: 1px solid var(--glass-border); transition: background 0.2s; border-radius: 12px;}
+.item-card:last-child { border-bottom: none; }
+.item-card:active { background: var(--glass-border); }
 .item-left { display: flex; align-items: center; gap: 15px; }
 .item-icon { width: 40px; height: 40px; background: var(--nav-bg); border-radius: 12px; display: flex; justify-content: center; align-items: center; color: var(--text-muted); }
 .item-info h5 { font-size: 15px; font-weight: 500; margin-bottom: 2px; }
@@ -87,11 +90,12 @@ body { background-color: var(--bg-main); color: var(--text-main); display: flex;
 .nav-item { background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 10px; transition: 0.3s; }
 .nav-item.active { color: var(--text-main); transform: translateY(-3px); }
 
-/* Modales */
-.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 100; }
-.modal-overlay.active { display: flex; }
-.modal-content { width: 90%; max-width: 380px; }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+/* Modales con transiciones suaves */
+.modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.7); backdrop-filter: blur(5px); display: none; justify-content: center; align-items: center; z-index: 100; transition: opacity 0.3s; opacity: 0; }
+.modal-overlay.active { display: flex; opacity: 1; }
+.modal-content { width: 90%; max-width: 380px; transform: scale(0.9); transition: transform 0.3s; max-height: 80vh; overflow-y: auto;}
+.modal-overlay.active .modal-content { transform: scale(1); }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: sticky; top: 0; background: var(--glass-bg); padding-top: 10px;}
 .close-btn { background: none; border: none; color: var(--text-main); cursor: pointer; }
 .view-title { font-size: 22px; margin-bottom: 20px; }
 .massive-balance { font-size: 42px; text-align: center; margin: 20px 0; }
@@ -104,3 +108,5 @@ body { background-color: var(--bg-main); color: var(--text-main); display: flex;
 .budget-stats { display: flex; justify-content: space-between; font-size: 11px; color: var(--text-muted); margin-top: 5px; }
 .budget-card { flex-direction: column; align-items: stretch; }
 .budget-header { display: flex; justify-content: space-between; align-items: center; }
+
+#f-desc { height: 60px; }

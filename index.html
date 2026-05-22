@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>Liquid Finance</title>
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -35,7 +35,7 @@
             </div>
 
             <button id="btnLogin" class="glass-btn">Iniciar Sesión</button>
-            <button id="btnRegister" class="glass-btn secondary">Crear Cuenta</button>
+            <button id="btnRegister" class="glass-btn secondary">Crear CuentaNueva</button>
             <button id="btnSubmitRegister" class="glass-btn" style="display: none; background: #4ca39b;">Confirmar</button>
             <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver</button>
             <p id="error-message" style="color: #ff8a8a; margin-top: 15px; display: none;"></p>
@@ -62,8 +62,8 @@
                 </div>
 
                 <div class="cards-scroller">
-                    <div class="summary-card income-card"><i data-lucide="trending-up"></i><div><p>Ingresos</p><h3 id="total-income">+$0</h3></div></div>
-                    <div class="summary-card expense-card"><i data-lucide="trending-down"></i><div><p>Egresos</p><h3 id="total-expense">-$0</h3></div></div>
+                    <div class="summary-card income-card" id="income-summary"><i data-lucide="trending-up"></i><div><p>Ingresos</p><h3 id="total-income">+$0</h3></div></div>
+                    <div class="summary-card expense-card" id="expense-summary"><i data-lucide="trending-down"></i><div><p>Egresos</p><h3 id="total-expense">-$0</h3></div></div>
                 </div>
 
                 <div class="quick-actions">
@@ -129,9 +129,19 @@
             <div class="modal-content glass-box">
                 <div class="modal-header">
                     <h4>Análisis Mensual</h4>
-                    <button class="close-btn" onclick="document.getElementById('modal-chart').classList.remove('active')"><i data-lucide="x"></i></button>
+                    <button class="close-btn" onclick="closeChartModal()"><i data-lucide="x"></i></button>
                 </div>
                 <canvas id="monthlyChart"></canvas>
+            </div>
+        </div>
+
+        <div class="modal-overlay" id="modal-filtered-transactions">
+            <div class="modal-content glass-box">
+                <div class="modal-header">
+                    <h4 id="filtered-transactions-title">Movimientos</h4>
+                    <button class="close-btn" onclick="closeFilteredTransactionsModal()"><i data-lucide="x"></i></button>
+                </div>
+                <div id="filtered-transactions-list" class="item-list"></div>
             </div>
         </div>
 
