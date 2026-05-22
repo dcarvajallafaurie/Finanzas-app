@@ -6,7 +6,7 @@ import { auth, db } from "./firebaseConfig.js";
 let budgets = [], transactions = [], wealth = [], creditCards = [], ccTransactions = [];
 let activeFormType = null, editingId = null, currentUser = null;
 let currentMonth = new Date().toISOString().slice(0, 7); // "YYYY-MM"
-let TRM = 3900; // Valor por defecto
+let TRM = 3900; 
 let myChart = null;
 
 const CATEGORIES = {
@@ -14,8 +14,8 @@ const CATEGORIES = {
     transaction: {
         "Salario": "income", "Ventas": "income", "Regalos": "income", "Rendimientos": "income",
         "Alimentación": "expense", "Transporte": "expense", "Servicios": "expense", "Entretenimiento": "expense", "Salud": "expense", "Compras": "expense", "Otras categorías": "expense",
-        "Emergencia": "expense", // Especial: Resta del Fondo de Emergencia
-        "Pago Tarjeta": "expense" // Especial: Restaura el cupo de la tarjeta
+        "Emergencia": "expense", 
+        "Pago Tarjeta": "expense" 
     },
     wealthIcons: [
         { name: "Fondo de Emergencia", icon: "shield" },
@@ -27,29 +27,27 @@ const CATEGORIES = {
     ]
 };
 
-// --- INICIALIZACIÓN Y API DE DÓLARES ---
+// --- INICIALIZACIÓN ---
 document.getElementById("month-selector").value = currentMonth;
 document.getElementById("month-selector").addEventListener("change", (e) => {
     currentMonth = e.target.value;
     actualizarDatosUI();
 });
 
-// Obtener TRM real al cargar
 fetch('https://open.er-api.com/v6/latest/USD')
     .then(res => res.json())
     .then(data => {
         TRM = data.rates.COP;
         document.getElementById("trm-display").textContent = `$${TRM.toFixed(0)} COP`;
-    }).catch(e => console.log("Error TRM, usando defecto"));
+    }).catch(e => console.log("Error TRM"));
 
-// Tema Claro / Oscuro
 document.getElementById("btnThemeToggle").addEventListener("click", () => {
     document.body.classList.toggle("light-mode");
 });
 
 function formatMoney(amount) { return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(amount); }
 
-// --- AUTH Y CAPTCHA ---
+// --- AUTH ---
 let captchaCorrect = 0;
 document.getElementById("btnRegister").addEventListener("click", () => {
     document.getElementById("btnLogin").style.display = "none";
@@ -71,7 +69,6 @@ document.getElementById("btnSubmitRegister").addEventListener("click", async () 
     try {
         const cred = await createUserWithEmailAndPassword(auth, email, password);
         await updateProfile(cred.user, { displayName: `${nombre} ${apellido}` });
-        // Crear tarjeta de crédito por defecto al registrar
         await addDoc(collection(db, "creditCards"), { userId: cred.user.uid, limit: 2000000, debt: 0, createdAt: Date.now() });
     } catch (e) { alert(e.message); }
 });
@@ -115,22 +112,18 @@ window.showView = (v) => {
     actualizarDatosUI();
 };
 
-// --- CÁLCULOS Y RENDERIZADO (MES DINÁMICO Y ROLLOVER) ---
+// --- RENDERIZADO (AHORA CON CLICS ACTIVADOS) ---
 function actualizarDatosUI() {
-    // 1. Filtrar Movimientos del Mes Actual
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth);
     let incMonth = currentMonthTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expMonth = currentMonthTrans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     
-    // 2. Rollover (Excedente de meses pasados)
     const pastTrans = transactions.filter(t => t.month < currentMonth);
-    const pastInc = pastTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
-    const pastExp = pastTrans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const rollover = pastInc - pastExp;
+    const rollover = pastTrans.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0) - pastTrans.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     
     if (rollover > 0) {
-        incMonth += rollover; // El excedente actúa como ingreso este mes
-        document.getElementById("rollover-indicator").textContent = `Saldo Disponible (Incluye +${formatMoney(rollover)} de meses pasados)`;
+        incMonth += rollover; 
+        document.getElementById("rollover-indicator").textContent = `Saldo Disponible (+${formatMoney(rollover)} del mes pasado)`;
     } else {
         document.getElementById("rollover-indicator").textContent = "Saldo Total Disponible";
     }
@@ -139,25 +132,25 @@ function actualizarDatosUI() {
     document.getElementById("total-expense").textContent = `-${formatMoney(expMonth)}`;
     document.getElementById("total-balance").textContent = formatMoney(incMonth - expMonth);
 
-    // 3. Tablero
+    // Tablero (¡Clics agregados aquí!)
     const cList = document.getElementById("transaction-list");
     cList.innerHTML = '';
     currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
         let isInc = t.type === 'income';
-        cList.innerHTML += `<div class="item-card"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
+        cList.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
     });
 
-    // 4. Presupuestos (Calculado solo con gastos del mes)
+    // Presupuestos (¡Clics agregados aquí!)
     const bList = document.getElementById("budget-list");
     bList.innerHTML = '';
     budgets.forEach(b => {
         const spent = currentMonthTrans.filter(t => t.type === 'expense' && t.category === b.category).reduce((s, t) => s + t.amount, 0);
         let pct = Math.min((spent / b.amount) * 100, 100);
         let color = pct >= 90 ? 'danger' : (pct >= 70 ? 'warning' : '');
-        bList.innerHTML += `<div class="item-card budget-card"><div class="budget-header"><div class="item-left"><div class="item-icon"><i data-lucide="target"></i></div><div class="item-info"><h5>${b.category}</h5></div></div><div style="font-weight:600;">Límite: ${formatMoney(b.amount)}</div></div><div class="budget-progress-container"><div class="budget-progress-fill ${color}" style="width: ${pct}%;"></div></div><div class="budget-stats"><span>Gastado: ${formatMoney(spent)}</span><span>Restante: ${formatMoney(b.amount - spent)}</span></div></div>`;
+        bList.innerHTML += `<div class="item-card budget-card" onclick="openEditForm('budget', '${b.id}')"><div class="budget-header"><div class="item-left"><div class="item-icon"><i data-lucide="target"></i></div><div class="item-info"><h5>${b.category}</h5></div></div><div style="font-weight:600;">Límite: ${formatMoney(b.amount)}</div></div><div class="budget-progress-container"><div class="budget-progress-fill ${color}" style="width: ${pct}%;"></div></div><div class="budget-stats"><span>Gastado: ${formatMoney(spent)}</span><span>Restante: ${formatMoney(b.amount - spent)}</span></div></div>`;
     });
 
-    // 5. Patrimonio
+    // Patrimonio (Mantenido)
     document.getElementById("total-wealth-value").textContent = formatMoney(wealth.reduce((s, w) => s + w.amount, 0));
     const wList = document.getElementById("wealth-list");
     wList.innerHTML = '';
@@ -165,25 +158,24 @@ function actualizarDatosUI() {
         wList.innerHTML += `<div class="item-card" onclick="openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatMoney(w.amount)}</div></div>`;
     });
 
-    // 6. Tarjeta de Crédito
+    // Tarjeta de Crédito (¡Clics agregados aquí!)
     if(creditCards.length > 0) {
         let cc = creditCards[0];
-        let debt = ccTransactions.filter(t=> t.month === currentMonth).reduce((s,t)=> s + t.amount, 0); // Gastos TC del mes
+        let debt = ccTransactions.filter(t=> t.month === currentMonth).reduce((s,t)=> s + t.amount, 0);
         document.getElementById("cc-debt").textContent = formatMoney(debt);
         document.getElementById("cc-available").textContent = formatMoney(cc.limit - debt);
         
         const ccList = document.getElementById("cc-transactions-list");
         ccList.innerHTML = '';
         ccTransactions.filter(t=> t.month === currentMonth).forEach(t => {
-            ccList.innerHTML += `<div class="item-card"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
+            ccList.innerHTML += `<div class="item-card" onclick="openEditForm('cc-transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="val-expense">-${formatMoney(t.amount)}</div></div>`;
         });
     }
-
     lucide.createIcons();
 }
 
-// --- MODAL DE MOVIMIENTOS FILTRADOS ---
-function openFilteredTransactionsModal(type) {
+// Modal de Movimientos Filtrados (¡Clics agregados aquí también!)
+window.openFilteredTransactionsModal = (type) => {
     document.getElementById("modal-filtered-transactions").classList.add('active');
     document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Ingresos' : 'Egresos';
     const currentMonthTrans = transactions.filter(t => t.month === currentMonth && t.type === type);
@@ -191,18 +183,14 @@ function openFilteredTransactionsModal(type) {
     container.innerHTML = currentMonthTrans.length ? '' : `<p style="text-align:center; color:#6a7c82; font-size:14px;">No hay movimientos este mes.</p>`;
     currentMonthTrans.sort((a,b)=>b.createdAt - a.createdAt).forEach(t => {
         let isInc = t.type === 'income';
-        container.innerHTML += `<div class="item-card"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
+        container.innerHTML += `<div class="item-card" onclick="openEditForm('transaction', '${t.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${isInc?'arrow-down-left':'arrow-up-right'}"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description}</p></div></div><div class="${isInc?'val-income':'val-expense'}">${isInc?'+':'-'}${formatMoney(t.amount)}</div></div>`;
     });
     lucide.createIcons();
 }
 
-function closeFilteredTransactionsModal() {
-    document.getElementById("modal-filtered-transactions").classList.remove('active');
-}
-
-document.getElementById("income-summary").addEventListener("click", () => openFilteredTransactionsModal('income'));
-document.getElementById("expense-summary").addEventListener("click", () => openFilteredTransactionsModal('expense'));
-
+window.closeFilteredTransactionsModal = () => document.getElementById("modal-filtered-transactions").classList.remove('active');
+document.getElementById("income-summary").addEventListener("click", () => window.openFilteredTransactionsModal('income'));
+document.getElementById("expense-summary").addEventListener("click", () => window.openFilteredTransactionsModal('expense'));
 
 // --- FORMULARIOS ---
 window.toggleForm = (type = null) => {
@@ -215,7 +203,7 @@ window.toggleForm = (type = null) => {
     if (type === 'transaction') {
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${Object.keys(CATEGORIES.transaction).map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Valor ($)"><textarea id="f-desc" class="glass-input" placeholder="Descripción detallada"></textarea>`;
     } else if (type === 'wealth') {
-        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><div style="display:flex; gap:10px;"><input type="number" id="f-amount" class="glass-input" placeholder="Monto"><div style="margin-top:15px; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="f-usd"> <label style="font-size:12px;">Es USD</label></div></div><p style="font-size:11px; opacity:0.7; margin-top:5px;">Si es USD, se multiplicará por el TRM actual.</p>`;
+        fields.innerHTML = `<select id="f-type" class="glass-input"><option value="" disabled selected>Tipo</option>${CATEGORIES.wealthIcons.map(w=>`<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre"><div style="display:flex; gap:10px;"><input type="number" id="f-amount" class="glass-input" placeholder="Monto"><div style="margin-top:15px; display:flex; align-items:center; gap:5px;"><input type="checkbox" id="f-usd"> <label style="font-size:12px;">Es USD</label></div></div>`;
     } else if (type === 'budget') {
         fields.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${CATEGORIES.budget.map(c=>`<option value="${c}">${c}</option>`).join('')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Mensual ($)">`;
     } else if (type === 'cc-transaction') {
@@ -223,33 +211,40 @@ window.toggleForm = (type = null) => {
     }
 };
 
+// Carga la información en el formulario para poder editarla o borrarla
 window.openEditForm = (type, id) => {
     window.toggleForm(type);
     editingId = id;
     document.getElementById("btnDeleteForm").style.display = 'block';
-    let item = wealth.find(i => i.id === id); // Solo permitimos editar wealth por simplicidad
-    if(item) {
-        document.getElementById("f-type").value = `${item.name}|${item.icon}`;
-        document.getElementById("f-amount").value = item.amount;
-        document.getElementById("f-desc").value = item.description || "";
+    
+    let item;
+    if (type === 'wealth') item = wealth.find(i => i.id === id);
+    else if (type === 'transaction') item = transactions.find(i => i.id === id);
+    else if (type === 'cc-transaction') item = ccTransactions.find(i => i.id === id);
+    else if (type === 'budget') item = budgets.find(i => i.id === id);
+
+    if (item) {
+        if (type === 'wealth') {
+            document.getElementById("f-type").value = `${item.name}|${item.icon}`;
+            document.getElementById("f-amount").value = item.amount;
+            document.getElementById("f-desc").value = item.description || "";
+        } else {
+            document.getElementById("f-cat").value = item.category;
+            document.getElementById("f-amount").value = item.amount;
+            if (document.getElementById("f-desc")) document.getElementById("f-desc").value = item.description || "";
+        }
     }
 };
 
-function generarSelect(options, placeholder) {
-    return `<select id="f-cat" class="glass-input"><option value="" disabled selected>${placeholder}</option>${options.map(c=>`<option value="${c}">${c}</option>`).join('')}</select>`;
-}
-
-// --- GUARDAR CON LÓGICA INTELIGENTE (Contabilidad Partida Doble) ---
+// --- GUARDAR ---
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
     document.getElementById("btnSubmitForm").disabled = true;
-
     let data = { userId: currentUser.uid, createdAt: Date.now() };
 
     if (activeFormType === 'wealth') {
         let amt = parseFloat(document.getElementById("f-amount").value);
-        if(document.getElementById("f-usd").checked) amt = amt * TRM; // Conversión a COP
-        
+        if(document.getElementById("f-usd") && document.getElementById("f-usd").checked) amt = amt * TRM; 
         const [name, icon] = document.getElementById("f-type").value.split('|');
         data = { ...data, name, icon, amount: amt, description: document.getElementById("f-desc").value };
         if(editingId) await updateDoc(doc(db, "wealth", editingId), data);
@@ -259,69 +254,64 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
         const cat = document.getElementById("f-cat").value;
         const amt = parseFloat(document.getElementById("f-amount").value);
         data = { ...data, category: cat, amount: amt, type: CATEGORIES.transaction[cat], description: document.getElementById("f-desc").value, month: currentMonth };
-        
-        // Lógica: Restar de Fondo de Emergencia
         if (cat === "Emergencia") {
             let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
             if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: fondo.amount - amt });
         }
-        // Lógica: Pago de Tarjeta de Crédito (Resta deuda)
         if (cat === "Pago Tarjeta" && creditCards.length > 0) {
             let cc = creditCards[0];
             await updateDoc(doc(db, "creditCards", cc.id), { debt: Math.max(0, cc.debt - amt) });
         }
-        await addDoc(collection(db, "transactions"), data);
+        if(editingId) await updateDoc(doc(db, "transactions", editingId), data);
+        else await addDoc(collection(db, "transactions"), data);
 
     } else if (activeFormType === 'cc-transaction') {
-        // Gasto con TC no afecta el saldo principal, va a ccTransactions
         data = { ...data, category: document.getElementById("f-cat").value, amount: parseFloat(document.getElementById("f-amount").value), description: document.getElementById("f-desc").value, month: currentMonth };
-        await addDoc(collection(db, "ccTransactions"), data);
-        if(creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { debt: creditCards[0].debt + data.amount });
+        if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), data);
+        else {
+            await addDoc(collection(db, "ccTransactions"), data);
+            if(creditCards.length > 0) await updateDoc(doc(db, "creditCards", creditCards[0].id), { debt: creditCards[0].debt + data.amount });
+        }
     } else if (activeFormType === 'budget') {
         data = { ...data, category: document.getElementById("f-cat").value, amount: parseFloat(document.getElementById("f-amount").value) };
-        await addDoc(collection(db, "budgets"), data);
+        if(editingId) await updateDoc(doc(db, "budgets", editingId), data);
+        else await addDoc(collection(db, "budgets"), data);
     }
     
     window.toggleForm();
     document.getElementById("btnSubmitForm").disabled = false;
 });
 
-// --- ELIMINAR ---
+// --- ELIMINACIÓN CORREGIDA ---
 document.getElementById("btnDeleteForm").addEventListener("click", async () => {
-    if (!editingId) {
-        alert("No hay un elemento seleccionado para eliminar.");
-        return;
-    }
+    if (!editingId) return;
+    
+    // Determina exactamente de qué carpeta de la base de datos se debe borrar
+    let collectionName = '';
+    if (activeFormType === 'transaction') collectionName = 'transactions';
+    else if (activeFormType === 'budget') collectionName = 'budgets';
+    else if (activeFormType === 'wealth') collectionName = 'wealth';
+    else if (activeFormType === 'cc-transaction') collectionName = 'ccTransactions';
 
-    const collectionName = activeFormType === 'transaction' ? 'transactions' : (activeFormType === 'budget' ? 'budgets' : 'wealth');
     try {
-        const docRef = doc(db, collectionName, editingId);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            await deleteDoc(docRef);
-            alert("Eliminado con éxito.");
-        } else {
-            alert("El elemento ya no existe o no se puede encontrar.");
-        }
+        await deleteDoc(doc(db, collectionName, editingId));
+        window.toggleForm(); // Cierra el modal después de borrar
+        window.closeFilteredTransactionsModal(); // Por si estaba abierto desde la vista filtrada
     } catch (e) {
         alert("Error al intentar eliminar: " + e.message);
     }
-    window.toggleForm();
 });
 
-// --- GRÁFICOS (CHART.JS) ---
+// --- GRÁFICOS ---
 window.openChartModal = () => {
     document.getElementById("modal-chart").classList.add('active');
     const ctx = document.getElementById('monthlyChart').getContext('2d');
-    
-    // Sumar gastos por categoría del mes actual
     let expByCategory = {};
     transactions.filter(t => t.type === 'expense' && t.month === currentMonth).forEach(t => {
         expByCategory[t.category] = (expByCategory[t.category] || 0) + t.amount;
     });
 
     if(myChart) myChart.destroy();
-    
     myChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
@@ -335,7 +325,10 @@ window.openChartModal = () => {
         options: { plugins: { legend: { position: 'bottom', labels: { color: 'var(--text-main)' } } } }
     });
 };
-
-window.closeChartModal = () => {
-    document.getElementById("modal-chart").classList.remove('active');
-}
+window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
+// Cierra cualquier modal al tocar el fondo oscuro (Modo Premium)
+window.addEventListener('click', (e) => {
+    if (e.target.classList.contains('modal-overlay')) {
+        e.target.classList.remove('active');
+    }
+});

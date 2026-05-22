@@ -95,8 +95,9 @@ body { background-color: var(--bg-main); color: var(--text-main); display: flex;
 .modal-overlay.active { display: flex; opacity: 1; }
 .modal-content { width: 90%; max-width: 380px; transform: scale(0.9); transition: transform 0.3s; max-height: 80vh; overflow-y: auto;}
 .modal-overlay.active .modal-content { transform: scale(1); }
-.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; position: sticky; top: 0; background: var(--glass-bg); padding-top: 10px;}
-.close-btn { background: none; border: none; color: var(--text-main); cursor: pointer; }
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; position: sticky; top: -20px; background: var(--glass-bg); padding: 20px 0 10px 0; z-index: 50; }
+.close-btn { background: none; border: none; color: var(--text-main); cursor: pointer; padding: 10px; margin-right: -10px; }
+.close-btn i { pointer-events: none; }
 .view-title { font-size: 22px; margin-bottom: 20px; }
 .massive-balance { font-size: 42px; text-align: center; margin: 20px 0; }
 
