@@ -13,9 +13,9 @@ const chartColors = ['#ef4444', '#f97316', '#eab308', '#84cc16', '#06b6d4', '#8b
 const CATEGORIES = {
     budget: ["Alimentación", "Transporte", "Servicios", "Entretenimiento", "Salud", "Otras categorías"],
     transaction: {
-        "Salario": "income", "Ventas": "income", "Regalos": "income", "Rendimientos": "income",
+        "Salario": "income", "Ventas": "income", "Rendimientos": "income", 
         "Alimentación": "expense", "Transporte": "expense", "Servicios": "expense", "Entretenimiento": "expense", "Salud": "expense", "Compras": "expense", "Otras categorías": "expense",
-        "Emergencia": "expense", "Pago Tarjeta": "expense" 
+        "Emergencia": "expense", "Pago Tarjeta": "expense",  "Regalos": "expense",
     },
     wealthIcons: [
         { name: "Fondo de Emergencia", icon: "shield" }, { name: "CDT", icon: "lock" }, { name: "Ahorro Programado", icon: "piggy-bank" },
