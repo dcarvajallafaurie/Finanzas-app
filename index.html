@@ -6,18 +6,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
-    <title>EVA</title>
-    <link rel="stylesheet" href="style.css?v=8">
+    <title>EVA - Inteligencia Financiera</title>
+    <link rel="stylesheet" href="style.css?v=9">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 
     <div id="app-container">
-        <div class="glass-panel fade-in" id="auth-panel" style="padding: 40px 20px; border: none; background: rgba(15, 23, 42, 0.4);">
-            <div style="margin-bottom: 40px;">
-                <h2 class="app-title" style="font-size: 46px; font-weight: 800; letter-spacing: 6px;">EVA</h2>
-                <p style="opacity: 0.5; font-size: 11px; letter-spacing: 4px; text-transform: uppercase;">Inteligencia Financiera</p>
+        <div class="glass-panel fade-in" id="auth-panel">
+            <div style="text-align: center; margin-bottom: 40px;">
+                <h2 class="app-title">EVA</h2>
+                <p class="app-subtitle">Inteligencia Financiera</p>
             </div>
             
             <div id="register-fields" style="display: none;">
@@ -29,7 +29,7 @@
             <input type="password" id="password" class="glass-input" placeholder="Contraseña">
             
             <div id="captcha-container" style="display: none; margin-top: 15px;">
-                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 5px;">Seguridad:</p>
+                <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 5px;">Seguridad Anti-Bot:</p>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span id="captcha-question" style="font-weight: bold; font-size: 18px;">? + ? =</span>
                     <input type="number" id="captcha-answer" class="glass-input" style="margin-top: 0; width: 80px;">
@@ -37,50 +37,50 @@
             </div>
 
             <button id="btnLogin" class="glass-btn pulse-btn" style="margin-top: 30px;">Iniciar Sesión</button>
-            <button id="btnRegister" class="glass-btn secondary" style="border-color: rgba(255,255,255,0.2);">Crear Cuenta</button>
+            <button id="btnRegister" class="glass-btn secondary" style="margin-top: 12px;">Crear Cuenta</button>
             <button id="btnSubmitRegister" class="glass-btn pulse-btn" style="display: none;">Confirmar Registro</button>
             <button id="btnBackToLogin" class="glass-btn secondary" style="display: none; border: none;">Volver</button>
-            <p id="error-message" style="color: #ff8a8a; margin-top: 15px; display: none;"></p>
+            <p id="error-message" style="color: var(--expense-color); margin-top: 15px; display: none; text-align: center; font-size: 14px;"></p>
         </div>
 
         <div id="dashboard-panel" style="display: none;">
-            
             <div class="top-header">
                 <div class="user-info">
                     <div class="avatar"><i data-lucide="user"></i></div>
                     <div>
                         <span id="user-display" style="font-weight: 600; display: block;">Usuario</span>
-                        <span id="full-date-display" style="font-size: 11px; color: var(--text-muted); text-transform: capitalize;">Cargando fecha...</span>
+                        <span id="full-date-display" style="font-size: 11px; color: var(--text-muted); text-transform: capitalize;">Fecha</span>
                     </div>
                 </div>
-                <div style="display: flex; gap: 8px;">
-                    <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 35px; width: 40px; color: transparent; background-image: url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%2216%22 height=%2216%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%2381949a%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22><rect x=%223%22 y=%224%22 width=%2218%22 height=%2218%22 rx=%222%22 ry=%222%22></rect><line x1=%2216%22 y1=%222%22 x2=%2216%22 y2=%226%22></line><line x1=%228%22 y1=%222%22 x2=%228%22 y2=%226%22></line><line x1=%223%22 y1=%2210%22 x2=%2221%22 y2=%2210%22></line></svg>'); background-repeat: no-repeat; background-position: center; cursor: pointer;">
-                    <button id="btnThemeToggle" class="icon-btn"><i data-lucide="sun"></i></button>
-                    <button id="btnLogout" class="icon-btn"><i data-lucide="log-out"></i></button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 35px; width: 40px; color: transparent; background-repeat: no-repeat; background-position: center; cursor: pointer;">
+                    <button id="btnThemeToggle" class="icon-btn" title="Cambiar Tema"><i data-lucide="sun"></i></button>
+                    <button id="btnLogout" class="icon-btn" title="Cerrar Sesión"><i data-lucide="log-out"></i></button>
                 </div>
             </div>
 
             <div class="view-container active fade-in" id="view-home">
                 <div class="balance-display">
-                    <p class="subtitle" id="rollover-indicator" style="margin-bottom: 5px;">Saldo Total Disponible</p>
-                    <h1 id="total-balance" style="font-size: 42px;">$0</h1>
+                    <p class="subtitle" id="rollover-indicator">Saldo Total Disponible</p>
+                    <h1 id="total-balance">$0.00</h1>
                 </div>
 
                 <div class="cards-scroller">
                     <div class="summary-card income-card" id="income-summary">
                         <div class="card-icon"><i data-lucide="arrow-up-right"></i></div>
-                        <div><p>Ingresos</p><h3 id="total-income">+$0</h3></div>
+                        <div><p>Ingresos</p><h3 id="total-income">+$0.00</h3></div>
                     </div>
                     <div class="summary-card expense-card" id="expense-summary">
                         <div class="card-icon"><i data-lucide="arrow-down-left"></i></div>
-                        <div><p>Egresos</p><h3 id="total-expense">-$0</h3></div>
+                        <div><p>Egresos</p><h3 id="total-expense">-$0.00</h3></div>
                     </div>
                 </div>
 
                 <div class="quick-actions">
-                    <button onclick="toggleForm('transaction')"><div class="icon-circle gradient-bg"><i data-lucide="plus"></i></div><span>Añadir</span></button>
-                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Portafolio</span></button>
+                    <button onclick="toggleForm('transaction')"><div class="icon-circle gradient-bg"><i data-lucide="plus"></i></div><span>Movimiento</span></button>
+                    <button onclick="showView('wealth')"><div class="icon-circle"><i data-lucide="briefcase"></i></div><span>Bolsillos</span></button>
                     <button onclick="openChartModal()"><div class="icon-circle"><i data-lucide="pie-chart"></i></div><span>Análisis</span></button>
+                    <button onclick="showView('categories')"><div class="icon-circle"><i data-lucide="sliders"></i></div><span>Categorías</span></button>
                 </div>
 
                 <div class="last-operations glass-box">
@@ -100,20 +100,30 @@
                 <div class="glass-box cc-hero-card">
                     <button onclick="toggleForm('edit-cc-limit')" class="cc-edit-btn"><i data-lucide="settings"></i></button>
                     <p class="cc-label">DEUDA TOTAL ACUMULADA</p>
-                    <h1 id="cc-debt" class="cc-balance">$0</h1>
-                    <p class="cc-limit">Cupo Disponible: <span id="cc-available">$0</span></p>
+                    <h1 id="cc-debt" class="cc-balance">$0.00</h1>
+                    <p class="cc-limit">Cupo Disponible: <span id="cc-available">$0.00</span></p>
                 </div>
-                <div class="section-head"><h3>Movimientos a Crédito</h3></div>
+                <div class="section-head"><h3>Movimientos de la Tarjeta</h3></div>
                 <div id="cc-transactions-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn pulse-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
             </div>
 
             <div class="view-container fade-in" id="view-wealth">
                 <h3 class="view-title">Mi Portafolio</h3>
-                <h1 id="total-wealth-value" class="massive-balance">$0</h1>
-                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">Activos (TRM: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">...</span>)</p>
+                <h1 id="total-wealth-value" class="massive-balance">$0.00</h1>
+                <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">
+                    Sincronización TRM: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">...</span>
+                    <button onclick="forzarActualizacionTRM()" class="icon-btn" style="display:inline-flex; width:24px; height:24px; margin-left:5px; vertical-align:middle;"><i data-lucide="refresh-cw" style="width:12px;"></i></button>
+                </p>
                 <div id="wealth-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn pulse-btn" onclick="toggleForm('wealth')"><i data-lucide="plus"></i></button>
+            </div>
+
+            <div class="view-container fade-in" id="view-categories">
+                <h3 class="view-title">Categorías Personalizadas</h3>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Administra tus segmentos de presupuesto.</p>
+                <div id="custom-categories-management-list" class="item-list glass-box" style="margin-bottom: 20px;"></div>
+                <button class="glass-btn pulse-btn" onclick="toggleForm('custom-category')"><i data-lucide="plus" style="vertical-align:middle; margin-right:5px;"></i> Nueva Categoría</button>
             </div>
 
             <nav class="bottom-nav">
@@ -131,9 +141,9 @@
                     <button class="close-btn" onclick="toggleForm()"><i data-lucide="x"></i></button>
                 </div>
                 <div id="form-fields"></div>
-                <div class="modal-actions" style="margin-top: 15px; display: flex; gap: 10px;">
-                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">Eliminar</button>
-                    <button class="glass-btn pulse-btn" id="btnSubmitForm" style="background: var(--accent-gradient); border:none; flex-grow:1;">Guardar</button>
+                <div class="modal-actions" style="margin-top: 20px; display: flex; gap: 10px;">
+                    <button class="glass-btn" id="btnDeleteForm" style="display: none; background: rgba(239, 68, 68, 0.1); color: var(--expense-color); border: 1px solid rgba(239, 68, 68, 0.3);">Eliminar</button>
+                    <button class="glass-btn pulse-btn" id="btnSubmitForm" style="flex-grow:1;">Guardar</button>
                 </div>
             </div>
         </div>
@@ -147,8 +157,8 @@
                 <div class="chart-wrapper">
                     <canvas id="monthlyChart"></canvas>
                     <div class="chart-center-info">
-                        <p>Total Gastado</p>
-                        <h3 id="chart-total-expense">$0</h3>
+                        <p>Total Egresos</p>
+                        <h3 id="chart-total-expense">$0.00</h3>
                     </div>
                 </div>
                 <div id="custom-legend" class="custom-legend-container"></div>
@@ -164,7 +174,6 @@
                 <div id="filtered-transactions-list" class="item-list"></div>
             </div>
         </div>
-
     </div>
 
     <script type="module" src="firebaseConfig.js"></script>

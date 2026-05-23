@@ -1,0 +1,9 @@
+interface BudgetCategory {
+  id: string;          // ID autogenerado por Firestore
+  userId: string;      // ID único del usuario propietario
+  name: string;        // Nombre de la categoría (ej: "Mascotas")
+  icon: string;        // Identificador para Lucide Icons (ej: "dog")
+  color: string;       // Código Hexadecimal (ej: "#ef4444")
+  isDefault: boolean;  // true si es del core de la app, false si es personalizada
+  createdAt: number;   // Timestamp Unix en milisegundos
+}

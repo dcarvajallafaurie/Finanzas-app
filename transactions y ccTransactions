@@ -1,0 +1,19 @@
+interface FinancialTransaction {
+  id: string;
+  userId: string;
+  createdAt: number;
+  month: string;               // Formato "YYYY-MM"
+  description: string;
+  category: string;            // ID o Nombre de la categoría asociada
+  // --- Camas de Precisión Monetaria y TRM ---
+  amount: number;              // Importe bruto capturado originalmente
+  baseCurrency: "COP" | "USD"; // Divisa de origen del movimiento
+  convertedAmount: number;     // Guardado estático inicial o calculado en COP
+  exchangeRate: number;        // TRM histórica capturada en el momento del registro
+  lastUpdatedAt: number;       // Timestamp de última mutación por TRM
+  // --- Integración de Tarjeta de Crédito ---
+  cuotas?: number;             // Solo para compras con TC (ccTransactions)
+  totalDebt?: number;          // Importe proyectado con intereses amortizados
+  isCreditCardSettlement?: boolean; // true si es un abono/pago a la tarjeta
+  sourceTransactionId?: string;     // Enlace al gasto de TC original mitigando la duplicidad
+}
