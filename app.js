@@ -11,7 +11,6 @@ let myChart = null;
 
 const chartColors = ['#f43f5e', '#3b82f6', '#eab308', '#10b981', '#a855f7', '#06b6d4', '#f97316'];
 
-// --- SOLUCIÓN 1: RECUPERAR TUS CATEGORÍAS CLÁSICAS ---
 const CATEGORIES = {
     budget: ["Alimentación", "Transporte", "Servicios", "Entretenimiento", "Salud", "Otras categorías"],
     transaction: {
@@ -25,26 +24,19 @@ const CATEGORIES = {
     ]
 };
 
-// Formateador de moneda (Máximo 2 decimales)
 export function formatCurrency(value, currency = "COP") {
     const numericValue = Number(value) || 0;
     const decimalCount = (numericValue % 1 === 0) ? 0 : 2;
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: currency, minimumFractionDigits: decimalCount, maximumFractionDigits: 2 }).format(numericValue);
 }
 
-// --- SOLUCIÓN 2: TRM LIMPIA (Sin decimales raros) ---
 async function sincronizarTRM() {
     document.getElementById("trm-display").textContent = "Sincronizando...";
     try {
         const respuesta = await fetch('https://open.er-api.com/v6/latest/USD');
         const datos = await respuesta.json();
-        if (datos && datos.rates && datos.rates.COP) {
-            systemTRM = parseFloat(datos.rates.COP);
-        }
-    } catch (error) {
-        console.log("Usando TRM por defecto");
-    }
-    // Formato sin decimales para la TRM visual
+        if (datos && datos.rates && datos.rates.COP) { systemTRM = parseFloat(datos.rates.COP); }
+    } catch (error) { console.log("Usando TRM por defecto"); }
     document.getElementById("trm-display").textContent = new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(systemTRM);
     if (currentUser) actualizarDatosUI();
 }
@@ -108,7 +100,11 @@ onAuthStateChanged(auth, (user) => {
 
 function cargarFlujosDeDatosFirebase() {
     const q = (col) => query(collection(db, col), where("userId", "==", currentUser.uid));
-    onSnapshot(q("categories"), snap => { customCategories = snap.docs.map(d => ({ id: d.id, ...d.data() })); actualizarDatosUI(); });
+    onSnapshot(q("categories"), snap => { 
+        customCategories = snap.docs.map(d => ({ id: d.id, ...d.data() })); 
+        renderizarVistaGestionCategorias();
+        actualizarDatosUI(); 
+    });
     onSnapshot(q("transactions"), snap => { transactions = snap.docs.map(d => ({id: d.id, ...d.data()})); actualizarDatosUI(); });
     onSnapshot(q("budgets"), snap => { budgets = snap.docs.map(d => ({id: d.id, ...d.data()})); actualizarDatosUI(); });
     onSnapshot(q("wealth"), snap => { wealth = snap.docs.map(d => ({id: d.id, ...d.data()})); actualizarDatosUI(); });
@@ -154,7 +150,6 @@ function actualizarDatosUI() {
     contenedorTransacciones.innerHTML = '';
     transaccionesDelMes.sort((a,b) => b.createdAt - a.createdAt).forEach(t => {
         let esIngreso = t.type === 'income';
-        // SOLUCIÓN 3: onClick explícito blindado
         contenedorTransacciones.innerHTML += `
             <div class="item-card" onclick="window.openEditForm('transaction', '${t.id}')">
                 <div class="item-left">
@@ -225,7 +220,6 @@ function actualizarDatosUI() {
     lucide.createIcons();
 }
 
-// --- SOLUCIÓN 4: BOTONES INGRESOS Y EGRESOS BLINDADOS ---
 window.openFilteredTransactionsModal = (type) => {
     document.getElementById("modal-filtered-transactions").classList.add('active');
     document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Total Ingresos' : 'Total Egresos';
@@ -242,15 +236,68 @@ window.closeFilteredTransactionsModal = () => document.getElementById("modal-fil
 document.getElementById("income-summary").addEventListener("click", () => window.openFilteredTransactionsModal('income'));
 document.getElementById("expense-summary").addEventListener("click", () => window.openFilteredTransactionsModal('expense'));
 
-// --- GENERADOR MEZCLADO DE CATEGORÍAS ---
-function obtenerOpcionesCategoriasHTML(tipoFormulario) {
-    let opciones = [];
-    if (tipoFormulario === 'budget' || tipoFormulario === 'cc-transaction') opciones = [...CATEGORIES.budget];
-    else opciones = Object.keys(CATEGORIES.transaction);
+// --- RENDERIZADO DE GESTIÓN DE CATEGORÍAS ---
+function renderizarVistaGestionCategorias() {
+    const contenedor = document.getElementById("custom-categories-management-list");
+    if (!contenedor) return;
+    contenedor.innerHTML = customCategories.length ? '' : '<p style="text-align:center; color:var(--text-muted); font-size:13px;">No has creado categorías propias aún.</p>';
     
-    // Sumar las nuevas sin borrar las tuyas
-    customCategories.forEach(c => { if (!opciones.includes(c.name)) opciones.push(c.name); });
-    return opciones.map(c => `<option value="${c}">${c}</option>`).join('');
+    customCategories.forEach(c => {
+        contenedor.innerHTML += `
+            <div class="item-card">
+                <div class="item-left">
+                    <div class="item-icon"><i data-lucide="tag"></i></div>
+                    <div class="item-info">
+                        <h5>${c.name}</h5>
+                        <p>${c.type === 'income' ? 'Ingreso' : 'Egreso'} (Personalizada)</p>
+                    </div>
+                </div>
+                <div>
+                    <button onclick="window.eliminarCategoriaExclusiva('${c.id}')" class="icon-btn" style="color:var(--expense-color); border:none; width: 32px; height: 32px;"><i data-lucide="trash-2" style="width:16px;"></i></button>
+                </div>
+            </div>`;
+    });
+    lucide.createIcons();
+}
+
+window.eliminarCategoriaExclusiva = async (id) => {
+    if(confirm("¿Estás seguro de eliminar esta categoría personalizada?")) {
+        try { await deleteDoc(doc(db, "categories", id)); } catch(e) { alert("Error al remover categoría"); }
+    }
+};
+
+// --- SELECTORES INTELIGENTES (Separados por Ingreso/Egreso) ---
+function obtenerOpcionesCategoriasHTML(tipoFormulario) {
+    let opcionesGasto = [];
+    let opcionesIngreso = [];
+    
+    // 1. Cargamos las clásicas
+    Object.keys(CATEGORIES.transaction).forEach(c => {
+        if (CATEGORIES.transaction[c] === 'income') opcionesIngreso.push(c);
+        else opcionesGasto.push(c);
+    });
+    
+    // 2. Cargamos las personalizadas en su grupo correcto
+    customCategories.forEach(c => {
+        if (c.type === 'income') {
+            if (!opcionesIngreso.includes(c.name)) opcionesIngreso.push(c.name);
+        } else {
+            if (!opcionesGasto.includes(c.name)) opcionesGasto.push(c.name);
+        }
+    });
+
+    if (tipoFormulario === 'budget' || tipoFormulario === 'cc-transaction') {
+        return opcionesGasto.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
+    
+    return `
+        <optgroup label="Egresos / Gastos" style="background: var(--bg-main); color: var(--text-main);">
+            ${opcionesGasto.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </optgroup>
+        <optgroup label="Ingresos" style="background: var(--bg-main); color: var(--text-main);">
+            ${opcionesIngreso.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </optgroup>
+    `;
 }
 
 // --- FORMULARIOS Y EDICIÓN ---
@@ -265,13 +312,16 @@ window.toggleForm = (tipoFormulario = null) => {
     
     if (tipoFormulario === 'transaction') {
         componenteTitulo.textContent = "Nuevo Movimiento";
-        contenedorCampos.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${obtenerOpcionesCategoriasHTML('transaction')}</select><select id="f-currency" class="glass-input"><option value="COP" selected>Pesos (COP)</option><option value="USD">Dólares (USD)</option></select><input type="number" id="f-amount" class="glass-input" placeholder="Importe"><textarea id="f-desc" class="glass-input" placeholder="Descripción corta"></textarea>`;
+        contenedorCampos.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Selecciona una Categoría</option>${obtenerOpcionesCategoriasHTML('transaction')}</select><select id="f-currency" class="glass-input"><option value="COP" selected>Pesos (COP)</option><option value="USD">Dólares (USD)</option></select><input type="number" id="f-amount" class="glass-input" placeholder="Importe"><textarea id="f-desc" class="glass-input" placeholder="Descripción corta"></textarea>`;
+    } else if (tipoFormulario === 'custom-category') {
+        componenteTitulo.textContent = "Crear Categoría Propia";
+        contenedorCampos.innerHTML = `<input type="text" id="f-cat-name" class="glass-input" placeholder="Nombre (Ej. Mascotas, Viajes)"><select id="f-cat-type" class="glass-input"><option value="expense" selected>Es un Gasto (Egreso)</option><option value="income">Es un Ingreso</option></select>`;
     } else if (tipoFormulario === 'wealth') {
         componenteTitulo.textContent = "Añadir Activo";
         contenedorCampos.innerHTML = `<select id="f-type" class="glass-input">${CATEGORIES.wealthIcons.map(w => `<option value="${w.name}|${w.icon}">${w.name}</option>`).join('')}</select><select id="f-currency" class="glass-input"><option value="COP" selected>COP</option><option value="USD">USD</option></select><input type="text" id="f-desc" class="glass-input" placeholder="Nombre específico"><input type="number" id="f-amount" class="glass-input" placeholder="Saldo actual">`;
     } else if (tipoFormulario === 'budget') {
         componenteTitulo.textContent = "Presupuesto Mensual";
-        contenedorCampos.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${obtenerOpcionesCategoriasHTML('budget')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Máximo ($ COP)">`;
+        contenedorCampos.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría a limitar</option>${obtenerOpcionesCategoriasHTML('budget')}</select><input type="number" id="f-amount" class="glass-input" placeholder="Límite Máximo ($ COP)">`;
     } else if (tipoFormulario === 'cc-transaction') {
         componenteTitulo.textContent = "Compra con Tarjeta";
         contenedorCampos.innerHTML = `<select id="f-cat" class="glass-input"><option value="" disabled selected>Categoría</option>${obtenerOpcionesCategoriasHTML('budget')}</select><select id="f-currency" class="glass-input"><option value="COP" selected>COP</option><option value="USD">USD</option></select><input type="number" id="f-amount" class="glass-input" placeholder="Monto"><input type="number" id="f-cuotas" class="glass-input" placeholder="Cuotas" value="1" min="1"><textarea id="f-desc" class="glass-input" placeholder="Detalle"></textarea>`;
@@ -293,7 +343,6 @@ window.openEditForm = (type, id) => {
     else if (type === 'cc-transaction') item = ccTransactions.find(i => i.id === id);
     else if (type === 'budget') item = budgets.find(i => i.id === id);
 
-    // Evitamos errores si el DOM no cargo un input
     if (item) {
         if (type === 'wealth') {
             const fType = document.getElementById("f-type"); if(fType) fType.value = `${item.name}|${item.icon}`;
@@ -309,13 +358,29 @@ window.openEditForm = (type, id) => {
 
 document.getElementById("btnSubmitForm").addEventListener("click", async () => {
     if (!activeFormType) return;
-    const fAmount = document.getElementById("f-amount");
-    if (fAmount && !fAmount.value) return alert("El monto es requerido.");
-
+    
     const btn = document.getElementById("btnSubmitForm");
     btn.disabled = true;
 
     try {
+        // --- GUARDADO DE CATEGORÍA PERSONALIZADA ---
+        if (activeFormType === 'custom-category') {
+            const nombreCat = document.getElementById("f-cat-name").value.trim();
+            const tipoCat = document.getElementById("f-cat-type").value;
+            if(!nombreCat) { btn.disabled = false; return alert("Especifica un nombre."); }
+            
+            if(customCategories.some(c => c.name.toLowerCase() === nombreCat.toLowerCase())) {
+                btn.disabled = false; return alert("Esta categoría ya existe.");
+            }
+            
+            await addDoc(collection(db, "categories"), { userId: currentUser.uid, name: nombreCat, type: tipoCat, createdAt: Date.now() });
+            window.toggleForm();
+            return; 
+        }
+
+        const fAmount = document.getElementById("f-amount");
+        if (fAmount && !fAmount.value) { btn.disabled = false; return alert("El monto es requerido."); }
+
         let payload = { userId: currentUser.uid, createdAt: Date.now() };
         let importeCapturado = fAmount ? parseFloat(fAmount.value) : 0;
         let divisaSeleccionada = document.getElementById("f-currency") ? document.getElementById("f-currency").value : "COP";
@@ -334,7 +399,15 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
             if(editingId) await updateDoc(doc(db, "wealth", editingId), payload); else await addDoc(collection(db, "wealth"), payload);
         } else if (activeFormType === 'transaction') {
             const cat = document.getElementById("f-cat").value;
-            payload = { ...payload, category: cat, type: CATEGORIES.transaction[cat] || "expense", description: document.getElementById("f-desc").value, month: currentMonth };
+            
+            // Detectar si la categoría es nativa o personalizada para guardar su tipo
+            let tipoDeducido = CATEGORIES.transaction[cat];
+            if (!tipoDeducido) {
+                const customMatch = customCategories.find(c => c.name === cat);
+                tipoDeducido = customMatch ? customMatch.type : "expense";
+            }
+
+            payload = { ...payload, category: cat, type: tipoDeducido, description: document.getElementById("f-desc").value, month: currentMonth };
             if (cat === "Emergencia") {
                 let fondo = wealth.find(w => w.name === "Fondo de Emergencia");
                 if (fondo) await updateDoc(doc(db, "wealth", fondo.id), { amount: Math.max(0, fondo.amount - (divisaSeleccionada === "USD" ? importeCapturado : (importeCapturado / systemTRM))) });
@@ -354,7 +427,7 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
             if(editingId) await updateDoc(doc(db, "budgets", editingId), dataPresupuesto); else await addDoc(collection(db, "budgets"), dataPresupuesto);
         }
         window.toggleForm();
-    } catch (err) { alert("Error al guardar: " + err.message); } finally { btn.disabled = false; }
+    } catch (err) { alert("Error al guardar: " + err.message); } finally { btn.disabled = false; btn.textContent = "Guardar"; }
 });
 
 document.getElementById("btnDeleteForm").addEventListener("click", async () => {
@@ -387,3 +460,22 @@ window.openChartModal = () => {
 
 window.closeChartModal = () => document.getElementById("modal-chart").classList.remove('active');
 window.addEventListener('click', (e) => { if (e.target.classList.contains('modal-overlay')) { e.target.classList.remove('active'); window.closeChartModal(); } });
+
+export function ejecutarSuiteDePruebasFinancieras() {
+    console.log("=== INICIANDO VALIDACIÓN DE PRUEBAS UNITARIAS (EVA CONTABLE) ===");
+    let pruebasPasadas = 0, pruebasTotales = 0;
+    const assert = (condicion, mensajeExito, mensajeError) => {
+        pruebasTotales++;
+        if (condicion) { console.log(`✅ TEST PASADO [${pruebasTotales}]: ${mensajeExito}`); pruebasPasadas++; } 
+        else { console.error(`❌ TEST FALLIDO [${pruebasTotales}]: ${mensajeError}`); }
+    };
+    try {
+        const r1 = formatCurrency(100, "COP").replace(/\s/g, '');
+        const r2 = formatCurrency(100.1, "COP").replace(/\s/g, '');
+        const r3 = formatCurrency(100.126, "COP").replace(/\s/g, '');
+        assert(r1.includes("100"), "Truncó enteros.", "Falla en enteros.");
+        assert(r2.includes("100,10"), "Rellenó el segundo decimal.", "Falla en un decimal.");
+        assert(r3.includes("100,13"), "Redondeó el tercer decimal.", "Falla en redondeo.");
+    } catch (e) { console.error("Excepción en Prueba 1:", e); }
+    console.log(`\n=== RESULTADO FINAL: PASADAS ${pruebasPasadas} DE ${pruebasTotales} PRUEBAS ===`);
+}
