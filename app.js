@@ -180,6 +180,7 @@ function actualizarDatosUI() {
     cBudg.innerHTML = budgets.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">Sin presupuestos.</p>`;
     budgets.forEach(b => {
         const gasEfectivo = txMes.filter(t => t.type === 'expense' && t.category === b.category).reduce((s, t) => s + resolverMontoCOP(t), 0);
+        // Presupuesto suma el costo principal base (t.amount), no la deuda proyectada con intereses.
         const gasTC = ccTransactions.filter(t => t.month === currentMonth && t.category === b.category).reduce((s, t) => s + resolverMontoCOP(t), 0); 
         const acumulado = gasEfectivo + gasTC;
         let pct = Math.min((acumulado / b.amount) * 100, 100);
@@ -201,7 +202,7 @@ function actualizarDatosUI() {
         cWealth.innerHTML += `<div class="item-card" onclick="window.openEditForm('wealth', '${w.id}')"><div class="item-left"><div class="item-icon"><i data-lucide="${w.icon || 'briefcase'}"></i></div><div class="item-info"><h5>${w.name}</h5></div></div><div style="font-weight:600;">${formatCurrency(resolverMontoCOP(w))}</div></div>`;
     });
 
-    // TARJETA DE CRÉDITO REAL
+    // --- LÓGICA DE TARJETA DE CRÉDITO CORREGIDA ---
     if (creditCards.length > 0) {
         let metaTC = creditCards[0];
         document.getElementById("cc-cut").textContent = metaTC.cutOffDate || "15";
@@ -210,13 +211,17 @@ function actualizarDatosUI() {
 
         let feeMes = metaTC.handlingFee || 0;
         
-        let deudaGenerada = ccTransactions.reduce((s, t) => s + (t.totalDebt || t.amount), 0) + feeMes;
-        let abonos = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s, t) => s + resolverMontoCOP(t), 0);
-        let deudaVigente = Math.max(0, deudaGenerada - abonos);
+        // 1. Deuda Real: Sumamos SOLO el valor base de las compras (t.amount) + la cuota de manejo
+        let deudaRealGenerada = ccTransactions.reduce((s, t) => s + t.amount, 0) + feeMes;
         
-        // CUPO LIBRE resta solo el 'amount' base original
-        let capitalConsumidoBruto = ccTransactions.reduce((s, t) => s + t.amount, 0); 
-        let cupoLibre = Math.max(0, metaTC.limit - (capitalConsumidoBruto - abonos));
+        // 2. Pagos hechos desde el tablero a la Tarjeta de Crédito
+        let abonos = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s, t) => s + resolverMontoCOP(t), 0);
+        
+        // 3. Deuda Vigente Final
+        let deudaVigente = Math.max(0, deudaRealGenerada - abonos);
+        
+        // 4. Cupo Disponible: Límite menos la deuda vigente
+        let cupoLibre = Math.max(0, metaTC.limit - deudaVigente);
 
         document.getElementById("cc-debt").textContent = formatCurrency(deudaVigente);
         document.getElementById("cc-available").textContent = formatCurrency(cupoLibre);
@@ -225,10 +230,10 @@ function actualizarDatosUI() {
         ccList.innerHTML = ccTransactions.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:10px;">Sin consumos.</p>`;
         
         ccTransactions.filter(t => t.month === currentMonth).forEach(t => {
-            // Diseño explícito para mostrar la alerta de intereses debajo
-            let cuotasInfo = t.cuotas > 1 ? `<br><span style="color:var(--expense-color); font-weight:bold; font-size:11px; display:inline-block; margin-top:4px;">↳ ${t.cuotas} Cuotas. Total final con intereses: ${formatCurrency(t.totalDebt)}</span>` : '';
+            // El Total con intereses es EXCLUSIVAMENTE una guía visual (texto en rojo)
+            let cuotasInfo = t.cuotas > 1 ? `<br><span style="color:var(--expense-color); font-weight:bold; font-size:11px; display:inline-block; margin-top:4px;">↳ Guía: ${t.cuotas} Cuotas. (Total proyectado con int: ${formatCurrency(t.totalDebt)})</span>` : '';
             
-            // El valor principal a la derecha es el que se resta del cupo
+            // A la derecha se muestra en grande el "t.amount" (ej: -48,100) que es el que se resta del cupo
             ccList.innerHTML += `
                 <div class="item-card" onclick="window.openEditForm('cc-transaction', '${t.id}')">
                     <div class="item-left">
@@ -245,6 +250,7 @@ function actualizarDatosUI() {
     lucide.createIcons();
 }
 
+// --- MODAL DE RESUMEN DE INGRESOS/EGRESOS ---
 window.openFilteredTransactionsModal = (type) => {
     document.getElementById("modal-filtered-transactions").classList.add('active');
     document.getElementById("filtered-transactions-title").textContent = type === 'income' ? 'Ingresos' : 'Egresos';
@@ -258,6 +264,10 @@ window.openFilteredTransactionsModal = (type) => {
     lucide.createIcons();
 }
 window.closeFilteredTransactionsModal = () => document.getElementById("modal-filtered-transactions").classList.remove('active');
+
+// --- HABILITANDO CLICS EN LAS TARJETAS ROJAS Y VERDES ---
+document.getElementById("income-summary").onclick = () => window.openFilteredTransactionsModal('income');
+document.getElementById("expense-summary").onclick = () => window.openFilteredTransactionsModal('expense');
 
 // --- CATEGORÍAS PURAS ---
 function renderizarVistaGestionCategorias() {
@@ -360,7 +370,11 @@ document.getElementById("btnSubmitForm").addEventListener("click", async () => {
         } else if (activeFormType === 'cc-transaction') {
             const ctas = parseInt(document.getElementById("f-cuotas").value) || 1;
             let dProy = p.convertedAmount;
-            if (ctas > 1) { const tM = Math.pow(1.2817, 1/12)-1; dProy = ((p.convertedAmount*tM*Math.pow(1+tM,ctas))/(Math.pow(1+tM,ctas)-1))*ctas; }
+            if (ctas > 1) { 
+                const tM = Math.pow(1 + 0.2817, 1/12)-1; 
+                const cuotaMensual = (p.convertedAmount * tM * Math.pow(1 + tM, ctas)) / (Math.pow(1 + tM, ctas) - 1);
+                dProy = cuotaMensual * ctas; 
+            }
             p = { ...p, category: document.getElementById("f-cat").value, cuotas: ctas, totalDebt: dProy, description: document.getElementById("f-desc").value, month: currentMonth };
             if(editingId) await updateDoc(doc(db, "ccTransactions", editingId), p); else await addDoc(collection(db, "ccTransactions"), p);
         } else if (activeFormType === 'budget') {
@@ -402,14 +416,12 @@ window.openChartModal = () => {
     const ctxDoughnut = document.getElementById('monthlyChart').getContext('2d');
     const ctxBar = document.getElementById('comparisonChart').getContext('2d');
     
-    // Mes Actual
     let expCatMes = {}; let totalExpMes = 0;
     const resolverMontoCOP = (i) => i.baseCurrency==="USD"?(i.amount*systemTRM):(i.convertedAmount||i.amount);
     
     transactions.filter(t => t.type==='expense' && t.month===currentMonth).forEach(t => { let v=resolverMontoCOP(t); expCatMes[t.category]=(expCatMes[t.category]||0)+v; totalExpMes+=v; });
     ccTransactions.filter(t => t.month===currentMonth).forEach(t => { let v=resolverMontoCOP(t); expCatMes[t.category]=(expCatMes[t.category]||0)+v; totalExpMes+=v; });
 
-    // Mes Anterior (Para comparativa)
     let [y, m] = currentMonth.split('-');
     let datePrev = new Date(y, parseInt(m)-2, 1);
     let prevMonthStr = `${datePrev.getFullYear()}-${String(datePrev.getMonth()+1).padStart(2,'0')}`;
@@ -421,7 +433,6 @@ window.openChartModal = () => {
     document.getElementById("chart-total-expense").textContent = formatCurrency(totalExpMes);
     const leg = document.getElementById("custom-legend"); leg.innerHTML = '';
     
-    // Configurar Leyenda y Donut Chart
     Object.keys(expCatMes).forEach((cat, idx) => {
         let p = totalExpMes > 0 ? Math.round((expCatMes[cat]/totalExpMes)*100) : 0;
         leg.innerHTML += `<div class="legend-item"><div style="display:flex; align-items:center; font-size:14px; font-weight:500;"><span class="legend-color-box" style="background:${chartColors[idx%chartColors.length]}"></span>${cat}</div><div><span style="font-weight:700;">${formatCurrency(expCatMes[cat])}</span><span style="font-size:12px; color:var(--text-muted); margin-left:6px;">${p}%</span></div></div>`;
@@ -430,7 +441,6 @@ window.openChartModal = () => {
     if (myChart) myChart.destroy();
     myChart = new Chart(ctxDoughnut, { type: 'doughnut', data: { labels: Object.keys(expCatMes), datasets: [{ data: Object.values(expCatMes), backgroundColor: chartColors, borderWidth: 2, borderColor: getComputedStyle(document.body).getPropertyValue('--glass-bg').trim() }] }, options: { cutout: '78%', plugins: { legend: { display: false } } } });
 
-    // Configurar Bar Chart (Comparativa Top 3)
     let topCats = Object.keys(expCatMes).sort((a,b)=>expCatMes[b]-expCatMes[a]).slice(0,3);
     let dataCurrent = topCats.map(c => expCatMes[c] || 0);
     let dataPrev = topCats.map(c => expCatPrev[c] || 0);
