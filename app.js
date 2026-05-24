@@ -180,7 +180,7 @@ function actualizarDatosUI() {
     cBudg.innerHTML = budgets.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:14px; margin-top:20px;">Sin presupuestos.</p>`;
     budgets.forEach(b => {
         const gasEfectivo = txMes.filter(t => t.type === 'expense' && t.category === b.category).reduce((s, t) => s + resolverMontoCOP(t), 0);
-        const gasTC = ccTransactions.filter(t => t.month === currentMonth && t.category === b.category).reduce((s, t) => s + resolverMontoCOP(t), 0); // OJO: Presupuesto suma el costo principal base (no la deuda con interes inflada)
+        const gasTC = ccTransactions.filter(t => t.month === currentMonth && t.category === b.category).reduce((s, t) => s + resolverMontoCOP(t), 0); 
         const acumulado = gasEfectivo + gasTC;
         let pct = Math.min((acumulado / b.amount) * 100, 100);
         let color = pct >= 90 ? 'danger' : (pct >= 70 ? 'warning' : '');
@@ -208,15 +208,13 @@ function actualizarDatosUI() {
         document.getElementById("cc-pay").textContent = metaTC.paymentDate || "1";
         document.getElementById("cc-fee").textContent = formatCurrency(metaTC.handlingFee || 0);
 
-        // Cuota de manejo cuenta como deuda mensual fija
         let feeMes = metaTC.handlingFee || 0;
         
-        // Deuda a pagar (incluye intereses de diferidos pasados/actuales) -> Lo mostramos como "Pago Total"
         let deudaGenerada = ccTransactions.reduce((s, t) => s + (t.totalDebt || t.amount), 0) + feeMes;
         let abonos = transactions.filter(t => t.category === "Pago Tarjeta").reduce((s, t) => s + resolverMontoCOP(t), 0);
         let deudaVigente = Math.max(0, deudaGenerada - abonos);
         
-        // El CUPO LIBRE resta el 'amount' base del artículo original, NO el interes total, así funciona un banco
+        // CUPO LIBRE resta solo el 'amount' base original
         let capitalConsumidoBruto = ccTransactions.reduce((s, t) => s + t.amount, 0); 
         let cupoLibre = Math.max(0, metaTC.limit - (capitalConsumidoBruto - abonos));
 
@@ -227,12 +225,20 @@ function actualizarDatosUI() {
         ccList.innerHTML = ccTransactions.length ? '' : `<p style="text-align:center; color:var(--text-muted); font-size:12px; padding:10px;">Sin consumos.</p>`;
         
         ccTransactions.filter(t => t.month === currentMonth).forEach(t => {
-            let cuotasInfo = t.cuotas > 1 ? `<span style="color:var(--expense-color); font-weight:bold;">(${t.cuotas}C - Total a pagar: ${formatCurrency(t.totalDebt)})</span>` : '';
-            // El valor principal (-$60.000) es lo que se muestra grande restado
+            // Diseño explícito para mostrar la alerta de intereses debajo
+            let cuotasInfo = t.cuotas > 1 ? `<br><span style="color:var(--expense-color); font-weight:bold; font-size:11px; display:inline-block; margin-top:4px;">↳ ${t.cuotas} Cuotas. Total final con intereses: ${formatCurrency(t.totalDebt)}</span>` : '';
+            
+            // El valor principal a la derecha es el que se resta del cupo
             ccList.innerHTML += `
                 <div class="item-card" onclick="window.openEditForm('cc-transaction', '${t.id}')">
-                    <div class="item-left"><div class="item-icon"><i data-lucide="shopping-bag"></i></div><div class="item-info"><h5>${t.category}</h5><p>${t.description} ${cuotasInfo} • ${formatearFechaConHora(t.createdAt)}</p></div></div>
-                    <div class="val-expense">-${formatCurrency(t.amount)}</div>
+                    <div class="item-left">
+                        <div class="item-icon"><i data-lucide="shopping-bag"></i></div>
+                        <div class="item-info">
+                            <h5>${t.category}</h5>
+                            <p style="line-height:1.4;">${t.description || 'Compra'} • ${formatearFechaConHora(t.createdAt)}${cuotasInfo}</p>
+                        </div>
+                    </div>
+                    <div class="val-expense" style="font-size:16px;">-${formatCurrency(t.amount)}</div>
                 </div>`;
         });
     }
