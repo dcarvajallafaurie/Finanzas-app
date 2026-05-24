@@ -7,7 +7,7 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <link rel="manifest" href="manifest.json">
     <title>EVA - Inteligencia Financiera</title>
-    <link rel="stylesheet" href="style.css?v=9">
+    <link rel="stylesheet" href="style.css?v=10">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -19,15 +19,12 @@
                 <h2 class="app-title">EVA</h2>
                 <p class="app-subtitle">Inteligencia Financiera</p>
             </div>
-            
             <div id="register-fields" style="display: none;">
                 <input type="text" id="nombre" class="glass-input" placeholder="Nombre">
                 <input type="text" id="apellido" class="glass-input" placeholder="Apellido">
             </div>
-
             <input type="email" id="email" class="glass-input" placeholder="Correo electrónico">
             <input type="password" id="password" class="glass-input" placeholder="Contraseña">
-            
             <div id="captcha-container" style="display: none; margin-top: 15px;">
                 <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 5px;">Seguridad Anti-Bot:</p>
                 <div style="display: flex; gap: 10px; align-items: center;">
@@ -35,7 +32,6 @@
                     <input type="number" id="captcha-answer" class="glass-input" style="margin-top: 0; width: 80px;">
                 </div>
             </div>
-
             <button id="btnLogin" class="glass-btn pulse-btn" style="margin-top: 30px;">Iniciar Sesión</button>
             <button id="btnRegister" class="glass-btn secondary" style="margin-top: 12px;">Crear Cuenta</button>
             <button id="btnSubmitRegister" class="glass-btn pulse-btn" style="display: none;">Confirmar Registro</button>
@@ -54,8 +50,8 @@
                 </div>
                 <div style="display: flex; gap: 8px; align-items: center;">
                     <input type="month" id="month-selector" class="glass-input" style="margin: 0; padding: 5px; height: 35px; width: 40px; color: transparent; background-repeat: no-repeat; background-position: center; cursor: pointer;">
-                    <button id="btnThemeToggle" class="icon-btn" title="Cambiar Tema"><i data-lucide="sun"></i></button>
-                    <button id="btnLogout" class="icon-btn" title="Cerrar Sesión"><i data-lucide="log-out"></i></button>
+                    <button id="btnThemeToggle" class="icon-btn"><i data-lucide="sun"></i></button>
+                    <button id="btnLogout" class="icon-btn"><i data-lucide="log-out"></i></button>
                 </div>
             </div>
 
@@ -84,7 +80,15 @@
                 </div>
 
                 <div class="last-operations glass-box">
-                    <div class="section-head"><h3>Movimientos del Mes</h3></div>
+                    <div class="section-head" style="display:flex; justify-content:space-between; align-items:center;">
+                        <h3>Movimientos del Mes</h3>
+                        <select id="sort-transactions" class="glass-input" style="width:auto; padding:5px; margin:0; height:30px; font-size:12px; border-radius:8px;">
+                            <option value="date-desc">Más nuevos</option>
+                            <option value="date-asc">Más antiguos</option>
+                            <option value="amount-desc">Mayor valor</option>
+                            <option value="amount-asc">Menor valor</option>
+                        </select>
+                    </div>
                     <div id="transaction-list" class="item-list"></div>
                 </div>
             </div>
@@ -99,11 +103,17 @@
                 <h3 class="view-title">Tarjeta de Crédito</h3>
                 <div class="glass-box cc-hero-card">
                     <button onclick="toggleForm('edit-cc-limit')" class="cc-edit-btn"><i data-lucide="settings"></i></button>
-                    <p class="cc-label">DEUDA TOTAL ACUMULADA</p>
+                    <p class="cc-label">PAGO TOTAL DEL MES</p>
                     <h1 id="cc-debt" class="cc-balance">$0.00</h1>
-                    <p class="cc-limit">Cupo Disponible: <span id="cc-available">$0.00</span></p>
+                    <div style="display:flex; justify-content:space-between; margin-bottom:10px;">
+                        <span style="font-size:12px; opacity:0.8;">Corte: <b id="cc-cut">--</b></span>
+                        <span style="font-size:12px; opacity:0.8;">Pago: <b id="cc-pay">--</b></span>
+                    </div>
+                    <p class="cc-limit">Cupo Libre: <span id="cc-available">$0.00</span> | Cuota Manejo: <span id="cc-fee">$0.00</span></p>
                 </div>
-                <div class="section-head"><h3>Movimientos de la Tarjeta</h3></div>
+                <div class="section-head" style="display:flex; justify-content:space-between; align-items:center;">
+                    <h3>Movimientos a Crédito</h3>
+                </div>
                 <div id="cc-transactions-list" class="item-list glass-box"></div>
                 <button class="floating-action-btn pulse-btn" onclick="toggleForm('cc-transaction')"><i data-lucide="plus"></i></button>
             </div>
@@ -112,7 +122,7 @@
                 <h3 class="view-title">Mi Portafolio</h3>
                 <h1 id="total-wealth-value" class="massive-balance">$0.00</h1>
                 <p style="text-align: center; color: var(--text-muted); margin-bottom: 20px;">
-                    Sincronización TRM: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">...</span>
+                    TRM Sincronizada: <span id="trm-display" style="color:var(--text-main); font-weight:bold;">...</span>
                     <button onclick="forzarActualizacionTRM()" class="icon-btn" style="display:inline-flex; width:24px; height:24px; margin-left:5px; vertical-align:middle;"><i data-lucide="refresh-cw" style="width:12px;"></i></button>
                 </p>
                 <div id="wealth-list" class="item-list glass-box"></div>
@@ -121,9 +131,9 @@
 
             <div class="view-container fade-in" id="view-categories">
                 <h3 class="view-title">Categorías Personalizadas</h3>
-                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Administra tus segmentos de presupuesto.</p>
+                <p style="color: var(--text-muted); font-size: 13px; margin-bottom: 15px;">Administra tus categorías para usar en ingresos o egresos.</p>
                 <div id="custom-categories-management-list" class="item-list glass-box" style="margin-bottom: 20px;"></div>
-                <button class="glass-btn pulse-btn" onclick="toggleForm('custom-category')"><i data-lucide="plus" style="vertical-align:middle; margin-right:5px;"></i> Nueva Categoría</button>
+                <button class="glass-btn pulse-btn" onclick="toggleForm('custom-category')"><i data-lucide="plus" style="vertical-align:middle; margin-right:5px;"></i> Crear Categoría</button>
             </div>
 
             <nav class="bottom-nav">
@@ -149,11 +159,14 @@
         </div>
 
         <div class="modal-overlay" id="modal-chart">
-            <div class="modal-content glass-box slide-up">
+            <div class="modal-content glass-box slide-up" style="max-height: 90vh;">
                 <div class="modal-header">
-                    <h4>Análisis de Egresos</h4>
+                    <h4>Reporte Financiero</h4>
                     <button class="close-btn" onclick="closeChartModal()"><i data-lucide="x"></i></button>
                 </div>
+                <button onclick="exportarAExcel()" class="glass-btn secondary" style="margin-bottom: 20px; padding: 10px; font-size:14px;"><i data-lucide="download" style="vertical-align:middle; width:16px;"></i> Exportar Excel (CSV)</button>
+                
+                <h5 style="margin-bottom:10px; text-align:center;">Distribución del Mes</h5>
                 <div class="chart-wrapper">
                     <canvas id="monthlyChart"></canvas>
                     <div class="chart-center-info">
@@ -161,7 +174,13 @@
                         <h3 id="chart-total-expense">$0.00</h3>
                     </div>
                 </div>
-                <div id="custom-legend" class="custom-legend-container"></div>
+                
+                <h5 style="margin:25px 0 10px 0; text-align:center;">Mes Actual vs. Anterior</h5>
+                <div class="chart-wrapper" style="height:200px;">
+                    <canvas id="comparisonChart"></canvas>
+                </div>
+
+                <div id="custom-legend" class="custom-legend-container" style="margin-top:20px;"></div>
             </div>
         </div>
 
